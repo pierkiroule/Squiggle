@@ -1,60 +1,37 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f1eee6">
-  <meta name="description" content="Un espace de dessin partagé : les tracés deviennent des particules et prennent vie. Le Squiggle du Vivant •°.">
-  <title>Le Squiggle du Vivant •°</title>
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./src/style.css">
-  <script type="module" src="./src/main.js"></script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#ede8de">
+<meta name="description" content="Une encre vivante avec laquelle dessiner. Gardez les états qui résonnent et faites naître un morphing entre eux.">
+<title>Le Squiggle du Vivant •°</title><link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./src/style.css"><script type="module" src="./src/main.js"></script>
 </head>
 <body>
-  <canvas id="art" aria-label="Espace de dessin du Squiggle du Vivant. Dessinez au doigt, au stylet ou à la souris."></canvas>
-
-  <header>
-    <h1>Le Squiggle du Vivant •°</h1>
-    <p>Ce que nous traçons prend vie.</p>
-  </header>
-
-  <div id="status" aria-hidden="true"></div>
-
-  <footer>
-    <div id="invitation" aria-live="polite">
-      Dessinez librement. Puis laissez la forme vous surprendre.
-    </div>
-
-    <div class="controls" role="group" aria-label="Participation">
-      <button id="patient" class="active" type="button" aria-pressed="true">Patient</button>
-      <button id="psy" type="button" aria-pressed="false">Psychologue</button>
-      <button id="observe" type="button" aria-pressed="false">Observer</button>
-    </div>
-
-    <div class="settings">
-      <label for="memory">
-        Mémoire
-        <input id="memory" type="range" min="0" max="100" value="38">
-      </label>
-      <label for="wild">
-        Sauvagerie
-        <input id="wild" type="range" min="0" max="100" value="62">
-      </label>
-      <label for="pigment">
-        Encre
-        <input id="pigment" type="range" min="10" max="100" value="70">
-      </label>
-    </div>
-
-    <div class="controls" role="group" aria-label="Œuvre">
-      <button id="pause" type="button" aria-pressed="false">Pause</button>
-      <button id="save" type="button">Enregistrer</button>
-      <button id="reset" type="button">Nouvelle œuvre</button>
-    </div>
-
-    <div id="help">Aucun dessin n'est interprété automatiquement.</div>
-  </footer>
-
-  <noscript>Activez JavaScript pour dessiner et laisser les formes prendre vie.</noscript>
-</body>
-</html>
+<header><div><p class="eyebrow">LE SQUIGGLE DU VIVANT •°</p><h1>Une matière. Une rencontre.</h1></div><button id="reset" type="button">Nouvelle encre</button></header>
+<main>
+<section class="atelier" aria-label="Surface d’encre vivante">
+<div class="surface-heading"><span id="mode">L’ENCRE EST VIVANTE</span><p id="invitation" role="status">Tracez dans la matière. Laissez-la vous répondre.</p></div>
+<div id="paper"><canvas id="art" aria-label="Surface d’encre vivante. Tracez au doigt, au stylet ou à la souris."></canvas><span class="signature" aria-hidden="true">ce qui apparaît vous appartient •°</span></div>
+<div class="tools">
+<label for="palette" class="select-label">Pigments<select id="palette"><option value="0">Abysses</option><option value="1">Incandescence</option><option value="2">Sous-bois</option></select></label>
+<div id="swatches" role="group" aria-label="Couleur du pigment"></div>
+<label for="size">Geste<input id="size" type="range" min="3" max="22" value="9"></label>
+<label for="activity">Souffle<input id="activity" type="range" min="0" max="100" value="55"></label>
+<label for="relief">Relief<input id="relief" type="range" min="0" max="100" value="55"></label>
+<button id="mirror" aria-pressed="false" type="button">Miroir</button><button id="pause" aria-pressed="false" type="button">Suspendre</button>
+<button id="resonate" class="primary" type="button">✧ Ça résonne</button>
+</div>
+</section>
+<section class="resonances" aria-labelledby="resonances-title">
+<div class="section-title"><div><p class="eyebrow">RETENIR CE QUI NOUS TOUCHE</p><h2 id="resonances-title">Les résonances <span id="count">0</span></h2></div><button id="animate" class="dark" type="button" disabled>Animer les résonances →</button></div>
+<p id="empty">Un état vous parle ? « Ça résonne » le garde ici. Dès deux états, faites naître leur métamorphose.</p>
+<div id="states" aria-label="États sauvegardés"></div>
+<div id="playback" hidden>
+<div class="playback-row"><button id="play" type="button">Ⅱ Pause</button><label class="scrub" for="timeline">Métamorphose<input id="timeline" type="range" min="0" max="1000" value="0"></label><label for="duration">Transition<select id="duration"><option value="2500">2,5 s</option><option value="4500" selected>4,5 s</option><option value="7000">7 s</option></select></label><button id="return" type="button">Revenir à l’encre</button></div>
+<div class="export-row"><button id="save" type="button">Image PNG</button><button id="video" type="button">Exporter l’animation</button><span id="export-status" role="status"></span></div>
+</div>
+<p class="note">Une expérience de projection libre, sans interprétation automatique. Les états restent dans cette page ; rechargez-la et ils disparaissent. Exportez vos images ou votre animation pour les conserver.</p>
+</section>
+</main>
+<dialog id="reset-dialog"><h2>Une nouvelle rencontre ?</h2><p>L’encre et les résonances de cette page seront effacées.</p><div class="playback-row"><button id="cancel-reset" type="button">Garder cette rencontre</button><button id="confirm-reset" class="primary" type="button">Nouvelle encre</button></div></dialog>
+<noscript>Activez JavaScript pour rencontrer l’encre vivante.</noscript>
+</body></html>
