@@ -38,3 +38,26 @@ test('pigment rendering produces opaque rich gradients and responds to relief', 
   const shades=new Set();for(let i=0;i<a.length;i+=4){assert.equal(a[i+3],255);shades.add(`${a[i]},${a[i+1]},${a[i+2]}`);}
   assert.ok(shades.size>300);
 });
+
+test('repeated overlapping pigments retain light instead of saturating to black', () => {
+  const s=createInk(30,24);
+  for(let j=0;j<400;j++)touchInk(s,15,12,['#254b58','#9b6486','#c19162'][j%3],6);
+  const i=12*30+15;
+  assert.ok((s.r[i]+s.g[i]+s.b[i])/3 < .851);
+  const pixels=new Uint8ClampedArray(30*24*4);renderInk(s,pixels);
+  const center=[...pixels.slice(i*4,i*4+3)];
+  assert.ok(Math.max(...center)>130,`dense overlap lost its light: ${center}`);
+  assert.ok(Math.max(...center)-Math.min(...center)>20,`dense overlap lost its color: ${center}`);
+});
+test('wet matter cannot darken spontaneously by generating neutral pigment', () => {
+  const s=createInk(12,10);s.r.fill(.6);s.g.fill(.4);s.b.fill(.3);s.wet.fill(1);
+  for(let j=0;j<200;j++)stepInk(s);
+  assert.ok(Math.abs(s.r[50]-.6)<1e-5);
+  assert.ok(Math.abs(s.g[50]-.4)<1e-5);
+  assert.ok(Math.abs(s.b[50]-.3)<1e-5);
+});
+test('older saturated captures are rendered with bounded optical depth', () => {
+  const s=createInk(4,4);s.r.fill(5);s.g.fill(4);s.b.fill(3);
+  const p=new Uint8ClampedArray(64);renderInk(s,p);
+  assert.ok(Math.max(p[0],p[1],p[2])>130);
+});

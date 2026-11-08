@@ -1,4 +1,5 @@
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const MAX_DENSITY = .85;
 export const PALETTES = [
   { name: 'Abysses', colors: ['#254b58', '#526b89', '#9b6486', '#c19162', '#447e79'] },
   { name: 'Incandescence', colors: ['#682c4c', '#b85c66', '#d29453', '#5b547f', '#a87c9c'] },
@@ -29,10 +30,15 @@ export function touchInk(s, x, y, color, radius, dx = 0, dy = 0, pressure = 1) {
       const weight = (Math.exp(-dist * 2) + Math.exp(-Math.pow((Math.sqrt(dist) - .9) / .13, 2)) * .22) * pressure;
       if (weight < .002) continue;
       const i = yy * w + xx;
-      // Optical absorption: pigment concentrates instead of adding opaque RGB.
+      // A shared concentration limit preserves channel ratios and leaves light in the wash.
       s.r[i] = Math.min(5, s.r[i] + (1 - r) * weight * .16);
       s.g[i] = Math.min(5, s.g[i] + (1 - g) * weight * .16);
       s.b[i] = Math.min(5, s.b[i] + (1 - b) * weight * .16);
+      const concentration = (s.r[i] + s.g[i] + s.b[i]) / 3;
+      if (concentration > MAX_DENSITY) {
+        const dilution = MAX_DENSITY / concentration;
+        s.r[i] *= dilution; s.g[i] *= dilution; s.b[i] *= dilution;
+      }
       s.wet[i] = Math.min(1, s.wet[i] + weight * .3);
       s.vx[i] += clamp(dx, -4, 4) * weight * .25;
       s.vy[i] += clamp(dy, -4, 4) * weight * .25;
@@ -73,8 +79,13 @@ export function stepInk(s, activity = .55) {
       const advected = sample(channel, w, h, sx, sy);
       const lap = channel[l] + channel[r] + channel[u] + channel[d] - 4 * channel[i];
       // Different pigment mobilities separate colors along wetting fronts.
-      const deposit = density > .12 ? (wet - .4) * density * .0008 : 0;
-      next[i] = clamp(advected + lap * rate * mobility + deposit, 0, 5);
+      // Movement redistributes pigment; wetness must not manufacture neutral ink.
+      next[i] = clamp(advected + lap * rate * mobility, 0, 5);
+    }
+    const concentration = (s.nr[i] + s.ng[i] + s.nb[i]) / 3;
+    if (concentration > MAX_DENSITY) {
+      const dilution = MAX_DENSITY / concentration;
+      s.nr[i] *= dilution; s.ng[i] *= dilution; s.nb[i] *= dilution;
     }
   }
   for (const [a, b] of [['r','nr'],['g','ng'],['b','nb'],['wet','nw'],['vx','nx'],['vy','ny']]) [s[a], s[b]] = [s[b], s[a]];
@@ -137,12 +148,16 @@ export function renderInk(s, pixels, relief = .55) {
     const edgeDeposit = Math.exp(-Math.pow((den - .055) / .022, 2)) * .6;
     const rim = Math.min(.7, edge * 2.5) * (1 - s.wet[i] * .35);
     const texture = 1 + grain * .16 * Math.min(1, den * 5) + rim + edgeDeposit + veins * .32;
-    const lighting = clamp(1 + (gx * .8 - gy * 1.3) * relief * 1.7, .7, 1.25);
+    const lighting = clamp(1 + (gx * .8 - gy * 1.3) * relief * 1.2, .88, 1.15);
     const pearl = Math.max(0, (gx - gy) * .5) * relief * 32;
     const paper = [246, 242, 234];
+    // Compress optical depth together, including older dense saved states.
+    // Discount common absorption so overlapping hues do not become charcoal.
+    const dilution = den > MAX_DENSITY ? MAX_DENSITY / den : 1;
+    const neutral = Math.min(s.r[i], s.g[i], s.b[i]) * .72;
     for (let c = 0; c < 3; c++) {
       const channel = c === 0 ? s.r : c === 1 ? s.g : s.b;
-      const stained = paper[c] * Math.exp(-channel[i] * texture * 2.9) * lighting + pearl;
+      const stained = paper[c] * Math.exp(-(channel[i] - neutral) * dilution * texture * 1.8) * lighting + pearl;
       pixels[p + c] = clamp(paper[c] * (1 - coverage) + stained * coverage + grain * .7, 0, 255);
     }
     pixels[p + 3] = 255;
