@@ -1,5 +1,5 @@
 "use strict";
-import { createHabitat, seedHabitat, stepHabitat, advancePigments } from "./living.mjs";
+import { createHabitat, seedHabitat, stepHabitat, advancePigments, createSwarm, advanceWaves, contactForce } from "./living.mjs";
 
 const $ = id => document.getElementById(id);
 const canvas = $("art");
@@ -19,7 +19,7 @@ const selectedColors = [0, 2];
 let mirrored = false;
 let diffusion = .55;
 
-const MAX_PARTICLES = 950;
+const MAX_PARTICLES = 6500;
 let habitat;
 const STEP = 1000 / 30;
 
@@ -27,17 +27,15 @@ let W = 0, H = 0, DPR = 1;
 let particles = [];
 let currentStroke = null;
 let activePointerId = null;
-let nextStrokeId = 1;
+let waves = [];
 let role = 0;
 let memory = .38;
 let wild = .62;
 let pigment = .7;
 let running = true;
 let observing = false;
-let elapsed = 0;
 let lastTime = performance.now();
 let accumulator = 0;
-let frameCounter = 0;
 let fpsTimer = 0;
 
 function makeLayer() {
@@ -45,44 +43,7 @@ function makeLayer() {
   return { canvas: layer, ctx: layer.getContext("2d") };
 }
 
-const traces = makeLayer();
-const gesture = makeLayer();
 const paper = makeLayer();
-const stamps = new Map();
-
-// Reusable translucent pigment grains: soft wash, irregular edges, sediment.
-function pigmentStamp(color) {
-  // Quantize evolving colors and bound the cache, including long sessions.
-  color = color.map(c => Math.round(c / 12) * 12);
-  const key = color.join(",");
-  if (stamps.has(key)) return stamps.get(key);
-  const stamp = document.createElement("canvas");
-  stamp.width = stamp.height = 96;
-  const g = stamp.getContext("2d");
-  const wash = g.createRadialGradient(48, 48, 2, 48, 48, 46);
-  wash.addColorStop(0, rgba(color, .28));
-  wash.addColorStop(.45, rgba(color, .15));
-  wash.addColorStop(.78, rgba(color, .045));
-  wash.addColorStop(1, rgba(color, 0));
-  g.fillStyle = wash;
-  g.fillRect(0, 0, 96, 96);
-  for (let i = 0; i < 150; i++) {
-    const angle = rand(0, TAU), radius = Math.sqrt(Math.random()) * 39;
-    g.fillStyle = rgba(color, rand(.025, .13));
-    g.fillRect(48 + Math.cos(angle) * radius, 48 + Math.sin(angle) * radius, rand(.4, 1.5), rand(.4, 1.5));
-  }
-  if (stamps.size >= 192) stamps.delete(stamps.keys().next().value);
-  stamps.set(key, stamp);
-  return stamp;
-}
-
-function dab(g, x, y, size, color, alpha = 1) {
-  g.save();
-  g.globalAlpha = alpha;
-  g.drawImage(pigmentStamp(color), x - size, y - size, size * 2, size * 2);
-  g.restore();
-}
-
 
 function rgba(c, a) {
   return `rgba(${c[0]},${c[1]},${c[2]},${clamp(a, 0, 1)})`;
@@ -99,23 +60,6 @@ function resize() {
   canvas.height = Math.round(H * DPR);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-  for (const layer of [traces, gesture]) {
-    const old = document.createElement("canvas");
-    old.width = layer.canvas.width;
-    old.height = layer.canvas.height;
-
-    if (old.width && old.height) {
-      old.getContext("2d").drawImage(layer.canvas, 0, 0);
-    }
-
-    layer.canvas.width = W;
-    layer.canvas.height = H;
-
-    if (old.width && old.height) {
-      layer.ctx.drawImage(old, 0, 0, old.width, old.height, 0, 0, W, H);
-    }
-  }
-
   if (oldW && oldH) {
     const sx = W / oldW, sy = H / oldH;
 
@@ -126,11 +70,10 @@ function resize() {
       p.homeY *= sy;
     }
 
+    for (const wave of waves) { wave.x *= sx; wave.y *= sy; }
     if (currentStroke) {
-      for (const p of currentStroke.points) {
-        p.x *= sx;
-        p.y *= sy;
-      }
+      currentStroke.x *= sx; currentStroke.y *= sy;
+      currentStroke.vx *= sx; currentStroke.vy *= sy;
     }
   }
 
@@ -149,162 +92,75 @@ function colorFor(r, index) {
   return PALETTES[paletteIndex].colors[(selectedColors[r] + index) % 6];
 }
 
-function makeParticle(x, y, stroke, index) {
-  if (particles.length >= MAX_PARTICLES) {
-    particles.splice(0, Math.min(15, particles.length));
-  }
+function renewSurface() {
+  const count = clamp(Math.round(W * H / 190), 2200, MAX_PARTICLES);
+  particles = createSwarm(W, H, count);
+  habitat = createHabitat(W, H);
+  waves = [];
+  $("status").textContent = particles.length + " micrograins";
+}
 
+function beginStroke(x, y, pressure = .5) {
+  currentStroke = { x, y, vx: 0, vy: 0, age: 0, distance: 0, pressure,
+    color: [...colorFor(role, 0)], mirrored, started: performance.now() };
   seedHabitat(habitat, x, y);
-  const angle = rand(0, TAU);
-  particles.push({
-    x, y,
-    homeX: x,
-    homeY: y,
-    vx: Math.cos(angle) * rand(.1, .7),
-    vy: Math.sin(angle) * rand(.1, .7),
-    color: [...stroke.color],
-    settled: 0, density: 0, activity: .5, signal: 0, heading: angle,
-    index,
-    phase: rand(0, TAU),
-    size: rand(8, 22),
-    ink: rand(.45, 1),
-    released: 0
-  });
 }
 
-function beginStroke(x, y) {
-  currentStroke = { id: nextStrokeId++, role, color: colorFor(role, 0), mirrored, points: [{ x, y }] };
-
-  const g = gesture.ctx;
-  dab(g, x, y, 24, currentStroke.color, pigment);
-  if (currentStroke.mirrored) dab(g, W - x, y, 24, currentStroke.color, pigment);
-  if (!running) render();
-}
-
-function addPoint(x, y) {
+function addPoint(x, y, pressure = .5) {
   if (!currentStroke) return;
-
-  const points = currentStroke.points;
-  const a = points[points.length - 1];
-  const dx = x - a.x, dy = y - a.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 1.5) return;
-
-  const n = Math.ceil(dist / 3);
-  const g = gesture.ctx;
-
-  for (let i = 1; i <= n; i++) {
-    const t = i / n;
-    const px = a.x + dx * t, py = a.y + dy * t;
-    dab(g, px, py, 18 + Math.min(12, dist * .08), currentStroke.color, pigment * .38);
-    if (currentStroke.mirrored) dab(g, W - px, py, 24, currentStroke.color, pigment * .38);
-
-    if (i % 2 === 0 || i === n) points.push({ x: px, y: py });
-  }
-
+  const dx = x - currentStroke.x, dy = y - currentStroke.y;
+  currentStroke.distance += Math.hypot(dx, dy);
+  // Limit impulses from sparse pointer events and retain a smooth wake.
+  currentStroke.vx = clamp(dx, -12, 12);
+  currentStroke.vy = clamp(dy, -12, 12);
+  currentStroke.x = x; currentStroke.y = y;
+  currentStroke.pressure = pressure;
 }
 
-function finishStroke() {
-  if (currentStroke) {
-    const points = currentStroke.points;
-    const stride = Math.max(1, Math.ceil(points.length / 180));
-
-    for (let i = 0; i < points.length; i += stride) {
-      for (let grain = 0; grain < 3; grain++) {
-        const x = points[i].x + rand(-14, 14), y = points[i].y + rand(-14, 14);
-        makeParticle(x, y, currentStroke, i + grain);
-        if (currentStroke.mirrored) makeParticle(W - x, y, currentStroke, i + grain);
-      }
+function finishStroke(cancelled = false) {
+  if (!cancelled && currentStroke && performance.now() - currentStroke.started < 350 && currentStroke.distance < 12) {
+    const { x, y, mirrored: mirror } = currentStroke;
+    // Even a very brief tap stains the existing grains, without adding dots.
+    if (running) {
+      const contacts = [currentStroke];
+      if (mirror) contacts.push({ ...currentStroke, x: W - x });
+      for (const p of particles) p.color = contactForce(p, contacts).color;
     }
-    currentStroke = null;
+    waves.push({ x, y, radius: 0, strength: 1 });
+    if (mirror) waves.push({ x: W - x, y, radius: 0, strength: 1 });
+    waves = waves.slice(-24);
   }
-
+  currentStroke = null;
   const pointerId = activePointerId;
   activePointerId = null;
-  if (pointerId !== null && canvas.hasPointerCapture(pointerId)) {
-    canvas.releasePointerCapture(pointerId);
-  }
+  if (pointerId !== null && canvas.hasPointerCapture(pointerId)) canvas.releasePointerCapture(pointerId);
   render();
 }
 
-function updateParticles() {
-  stepHabitat(habitat, diffusion);
-  stepHabitat(habitat, diffusion);
-  advancePigments(particles, habitat, { memory, wild, diffusion });
-}
-
-function drawParticles() {
-  ctx.save();
-  ctx.globalCompositeOperation = "multiply";
-  for (const p of particles) {
-    const radius = p.size * (.85 + diffusion * 1.5) * (.8 + p.activity * .45);
-    const stretch = 1 + Math.min(.75, Math.hypot(p.vx, p.vy) * .6);
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.rotate(p.heading);
-    ctx.scale(stretch, 1 / stretch);
-    dab(ctx, 0, 0, radius, p.color, pigment * (.18 + p.ink * .28) * (1 - p.settled * .35));
-    ctx.restore();
-    // Condensation and pores follow local activation and crowding.
-    if (p.signal > .12) {
-      ctx.strokeStyle = rgba(p.color, pigment * p.signal * .24);
-      ctx.lineWidth = .5 + p.settled;
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, radius * .55, radius * .28, p.heading, 0, TAU);
-      ctx.stroke();
-    }
-  }
-  ctx.restore();
-}
-
-function updateTraces() {
-  const g = traces.ctx;
-  g.save();
-  g.globalCompositeOperation = "destination-out";
-  g.fillStyle = `rgba(0,0,0,${.008 + (1 - memory) * .012})`;
-  g.fillRect(0, 0, W, H);
-  g.restore();
-
-  for (let i = 0; i < particles.length; i += 2) {
-    const p = particles[i];
-    dab(g, p.x, p.y, p.size * (1.4 + diffusion), p.color, pigment * (.025 + p.settled * .1));
-    if (p.settled > .12 || p.signal > .2) {
-      g.fillStyle = rgba(p.color, pigment * .1);
-      g.beginPath();
-      g.moveTo(p.x, p.y);
-      g.lineTo(p.x - Math.cos(p.heading) * (2 + p.settled * 8), p.y - Math.sin(p.heading) * (2 + p.settled * 8));
-      g.strokeStyle = rgba(p.color, pigment * (.05 + p.settled * .18));
-      g.lineWidth = .7;
-      g.stroke();
-    }
-  }
-}
-
-function updateGesture() {
-  if (currentStroke) return;
-  const g = gesture.ctx;
-  g.save();
-  g.globalCompositeOperation = "destination-out";
-  g.fillStyle = "rgba(0,0,0,.028)";
-  g.fillRect(0, 0, W, H);
-  g.restore();
-}
-
 function update() {
-  elapsed += STEP;
-  updateParticles();
-  if (frameCounter % 2 === 0) {
-    updateTraces();
-    updateGesture();
+  const contacts = [];
+  if (currentStroke) {
+    currentStroke.age = performance.now() - currentStroke.started;
+    contacts.push(currentStroke);
+    if (currentStroke.mirrored) contacts.push({ ...currentStroke, x: W - currentStroke.x, vx: -currentStroke.vx });
+    seedHabitat(habitat, currentStroke.x, currentStroke.y);
+    if (currentStroke.mirrored) seedHabitat(habitat, W - currentStroke.x, currentStroke.y);
   }
-  frameCounter++;
+  waves = advanceWaves(waves);
+  stepHabitat(habitat, diffusion);
+  advancePigments(particles, habitat, { memory, wild, diffusion, contacts, waves });
+  if (currentStroke) { currentStroke.vx *= .65; currentStroke.vy *= .65; }
 }
 
 function render() {
   ctx.drawImage(paper.canvas, 0, 0);
-  ctx.drawImage(traces.canvas, 0, 0);
-  ctx.drawImage(gesture.canvas, 0, 0);
-  drawParticles();
+  // Every pigment remains an individual dot: shapes come from their density.
+  for (const p of particles) {
+    ctx.fillStyle = rgba(p.color, (.35 + pigment * .6) * p.ink);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (.8 + pigment * .4), 0, TAU);
+    ctx.fill();
+  }
 }
 
 function point(e) {
@@ -316,12 +172,12 @@ function point(e) {
 }
 
 canvas.addEventListener("pointerdown", e => {
-  if (observing || activePointerId !== null || (e.pointerType === "mouse" && e.button !== 0)) return;
+  if (!running || observing || activePointerId !== null || (e.pointerType === "mouse" && e.button !== 0)) return;
   e.preventDefault();
   activePointerId = e.pointerId;
   canvas.setPointerCapture(e.pointerId);
   const p = point(e);
-  beginStroke(p.x, p.y);
+  beginStroke(p.x, p.y, e.pressure || .5);
 });
 
 canvas.addEventListener("pointermove", e => {
@@ -330,7 +186,7 @@ canvas.addEventListener("pointermove", e => {
   const events = e.getCoalescedEvents?.();
   for (const sample of events?.length ? events : [e]) {
     const p = point(sample);
-    addPoint(p.x, p.y);
+    addPoint(p.x, p.y, sample.pressure || .5);
   }
   if (!running) render();
 });
@@ -338,13 +194,13 @@ canvas.addEventListener("pointermove", e => {
 canvas.addEventListener("pointerup", e => {
   if (e.pointerId !== activePointerId) return;
   const p = point(e);
-  addPoint(p.x, p.y);
+  addPoint(p.x, p.y, e.pressure || .5);
   finishStroke();
 });
 
 for (const name of ["pointercancel", "lostpointercapture"]) {
   canvas.addEventListener(name, e => {
-    if (e.pointerId === activePointerId) finishStroke();
+    if (e.pointerId === activePointerId) finishStroke(true);
   });
 }
 
@@ -362,8 +218,8 @@ function setRole(r) {
   setPressed("psy", r === 1);
   setPressed("observe", false);
   $("invitation").textContent = r === 0
-    ? "Tracez librement. Le vivant poursuivra votre geste."
-    : "Répondez au dessin, sans chercher à le compléter.";
+    ? "Effleurez la nuée, tracez un courant, laissez une empreinte."
+    : "Répondez au mouvement par une autre touche de couleur.";
 }
 
 $("patient").onclick = () => setRole(0);
@@ -406,6 +262,7 @@ $("pigment").oninput = e => {
 };
 
 $("pause").onclick = () => {
+  finishStroke(true);
   running = !running;
   accumulator = 0;
   $("pause").textContent = running ? "Pause" : "Reprendre";
@@ -414,17 +271,13 @@ $("pause").onclick = () => {
 
 $("reset").onclick = () => {
   finishStroke();
-  particles = [];
-  habitat = createHabitat(W, H);
+  renewSurface();
   observing = false;
-  elapsed = 0;
   accumulator = 0;
-  frameCounter = 0;
-  traces.ctx.clearRect(0, 0, W, H);
-  gesture.ctx.clearRect(0, 0, W, H);
+
   setPressed("observe", false);
-  $("invitation").textContent = "Une nouvelle rencontre commence. Dessinez.";
-  $("status").textContent = "0 pigments";
+  $("invitation").textContent = "Une nouvelle surface vivante. Effleurez, tapotez ou restez un instant.";
+
   render();
 };
 
@@ -474,17 +327,19 @@ function animate(now) {
 
   fpsTimer += dt;
   if (fpsTimer > 1000) {
-    $("status").textContent = particles.length + " pigments";
+    $("status").textContent = particles.length + " micrograins";
     fpsTimer = 0;
   }
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) finishStroke();
+  if (document.hidden) finishStroke(true);
   lastTime = performance.now();
   accumulator = 0;
 });
-window.addEventListener("blur", finishStroke);
+window.addEventListener("blur", () => finishStroke(true));
 resize();
+renewSurface();
+render();
 window.addEventListener("resize", resize);
 requestAnimationFrame(animate);

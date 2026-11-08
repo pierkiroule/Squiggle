@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f1eee6">
-  <meta name="description" content="Un espace de dessin partagé : les tracés deviennent des particules et prennent vie. Le Squiggle du Vivant •°.">
+  <meta name="description" content="Un espace de dessin partagé : une nuée de micrograins réagit au toucher. Le Squiggle du Vivant •°.">
   <title>Le Squiggle du Vivant •°</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
   <link rel="stylesheet" href="./src/style.css">
@@ -15,14 +15,14 @@
 
   <header>
     <h1>Le Squiggle du Vivant •°</h1>
-    <p>Des pigments, des nuages, des formes à imaginer.</p>
+    <p>Effleurer le vivant. Laisser une forme émerger.</p>
   </header>
 
   <div id="status" aria-hidden="true"></div>
 
   <footer>
     <div id="invitation" aria-live="polite">
-      Déposez une couleur. Laissez émerger ce que vous y voyez.
+      Glissez pour créer un courant · Tapotez pour une onde · Restez pour rassembler
     </div>
 
     <div class="controls" role="group" aria-label="Participation">
@@ -39,7 +39,7 @@
         <option value="2">Marées</option>
       </select>
       <div id="swatches" role="group" aria-label="Couleur du pigment"></div>
-      <button id="mirror" type="button" aria-pressed="false" title="Déposer le geste des deux côtés ; les pigments évoluent ensuite librement">Miroir</button>
+      <button id="mirror" type="button" aria-pressed="false" title="Toucher la nuée des deux côtés ; les grains évoluent ensuite librement">Miroir</button>
     </div>
 
     <div class="settings">
@@ -56,7 +56,7 @@
         <input id="pigment" type="range" min="10" max="100" value="70">
       </label>
       <label for="diffusion">
-        Diffusion
+        Échanges
         <input id="diffusion" type="range" min="0" max="100" value="55">
       </label>
     </div>
@@ -70,6 +70,6 @@
     <div id="help">Des formes à imaginer, sans interprétation automatique.</div>
   </footer>
 
-  <noscript>Activez JavaScript pour dessiner et laisser les formes prendre vie.</noscript>
+  <noscript>Activez JavaScript pour toucher la nuée vivante.</noscript>
 </body>
 </html>

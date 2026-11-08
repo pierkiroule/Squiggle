@@ -1,22 +1,26 @@
 # Le Squiggle du Vivant •°
 
-**Ce que nous traçons prend vie.**
+**Effleurer le vivant. Laisser une forme émerger.**
 
-Un espace de dessin partagé entre patient et psychologue. Les gestes déposent des pigments de couleur : lavis translucides, grains et sédiments se superposent sur un papier texturé. La matière évolue par cohésion, alignement, séparation et mémoire du geste. Des taches, des silhouettes et des nuages ambigus émergent, se défont et se recomposent ; chacun reste libre d’y voir ses propres formes.
+Un espace partagé entre patient et psychologue : une surface déjà habitée par des milliers de micrograins, comme une nuée d’étourneaux. Chaque grain reste un point distinct. Les formes projectives apparaissent dans les courants, les densités et les vides créés par la rencontre avec le geste.
 
-## Utiliser
+L’inspiration est celle d’un dialogue avec une matière vivante, comme les signes mouvants de *Premier Contact*. L’application ne reconnaît pas de langage et ne produit pas de réponse sémantique : sa réponse est le mouvement collectif de la matière.
 
-- Dessiner au doigt, au stylet ou à la souris.
-- Passer de **Patient** à **Psychologue** pour changer de palette et répondre au dessin.
-- Choisir **Observer** pour suspendre les gestes et regarder les formes évoluer. Choisir un rôle pour reprendre le dessin.
-- Choisir une harmonie — **Nébuleuse**, **Terres vivantes** ou **Marées** — puis l’un de ses six pigments. Chaque rôle garde sa propre sélection ; changer de couleur ne recolore pas les pigments déjà déposés.
-- Activer **Miroir** pour déposer le geste des deux côtés, comme une tache pliée. Les deux nuées évoluent ensuite librement et la symétrie se transforme.
-- Ajuster **Mémoire** (attachement au geste et persistance des empreintes), **Sauvagerie** (mouvement), **Pigment** (densité) et **Diffusion** (étalement des nuées).
-- Mettre l’animation en **Pause**, **Enregistrer** une image PNG ou commencer une **Nouvelle œuvre**.
+## Toucher la surface
 
-Aucun dessin n’est interprété automatiquement. L’application ne contient ni IA, ni suivi d’audience, ni requête vers un service externe. L’œuvre reste en mémoire dans le navigateur ; recharger ou fermer la page l’efface. Le bouton **Enregistrer** permet de conserver une image sur son appareil.
+- **Glisser** au doigt, au stylet ou à la souris : écarter les grains et les entraîner dans un sillage.
+- **Tapoter** : transmettre une couleur aux grains au contact et déclencher une onde de dispersion qui se propage puis s’atténue.
+- **Rester au même endroit** : après un court maintien, attirer les grains et condenser la couleur. La pression du stylet module la portée et la transmission du pigment.
+- **Retirer le doigt** : laisser la nuée poursuivre son organisation. Le geste ne crée pas de grains supplémentaires.
+- Passer de **Patient** à **Psychologue** pour répondre avec sa propre couleur ; choisir **Observer** pour suspendre les contacts et regarder la matière évoluer.
+- Choisir une harmonie — **Nébuleuse**, **Terres vivantes**, **Marées** — puis l’un de ses six pigments. Chaque rôle garde sa sélection.
+- Activer **Miroir** pour toucher la surface des deux côtés. Les grains évoluent ensuite librement.
+- Ajuster **Mémoire** (attachement aux empreintes du geste), **Sauvagerie** (mobilité), **Pigment** (présence visuelle des points) et **Échanges** (transmission locale des couleurs et diffusion du milieu).
+- Mettre en **Pause**, **Enregistrer** une image PNG ou commencer une **Nouvelle œuvre**, qui renouvelle la population de la surface.
 
-## Lancer en local
+Aucun dessin n’est interprété automatiquement. Aucune IA, aucun suivi d’audience, aucun service externe. L’œuvre reste en mémoire dans le navigateur ; recharger ou fermer la page l’efface. **Enregistrer** conserve une image sur l’appareil.
+
+## Développer
 
 Node.js 20 ou plus récent. Aucune dépendance à installer.
 
@@ -24,9 +28,7 @@ Node.js 20 ou plus récent. Aucune dépendance à installer.
 npm run dev
 ```
 
-Ouvrir <http://localhost:5173>. Le serveur utilise `PORT` si cette variable est définie.
-
-## Construire
+Le serveur écoute sur le port 5173. La variable `PORT` ou l’argument `--port` permettent d’en choisir un autre.
 
 ```sh
 npm run check
@@ -35,32 +37,24 @@ npm run build
 npm run preview
 ```
 
-Le dossier `dist/` contient l’application statique complète. `npm run preview` la sert en local.
+`dist/` contient l’application statique complète. `vercel.json` configure la construction et ce dossier de sortie ; aucun secret requis. Tout hébergeur statique peut aussi servir `dist/`.
 
-## Déployer sur Vercel
+## Organisation de la nuée
 
-Importer ce dépôt dans Vercel. Le fichier `vercel.json` configure la commande `npm run build` et le dossier de sortie `dist`. Aucun secret ou service supplémentaire n’est requis.
+Il s’agit d’une analogie artistique inspirée de l’organisation du vivant, pas d’une simulation biologique validée.
 
-Tout hébergeur de fichiers statiques peut également servir le contenu de `dist/`.
+- **Une population préexistante** : de 2 200 à 6 500 micrograins selon la surface à l’ouverture. Une propulsion individuelle entretient le mouvement, même sans geste.
+- **Interactions locales** : alignement des vitesses, adhésion selon l’affinité chromatique et répulsion à courte distance. Aucun vent global ne dicte les trajectoires.
+- **Milieu actif** : les contacts ensemencent un milieu de réaction-diffusion Gray–Scott. L’activation consomme une ressource qui se renouvelle et diffuse ; les gradients orientent les grains.
+- **Empreinte du contact** : les mouvements, les ondes et l’attraction d’un contact maintenu déplacent les grains existants. Leur couleur se transmet au contact, puis lentement entre voisins. Les points éloignés gardent leur couleur.
+- **Mémoire et condensation** : les zones denses ralentissent, les positions de référence se déplacent au contact et les nuées gardent temporairement l’empreinte du geste. Les formes restent composées de points, sans lavis, flou ni contours dessinés par-dessus.
+
+La simulation fonctionne à pas fixes de 30 Hz avec voisinage spatial et grille plafonnée à 160 × 120 cellules. Les positions et le milieu sont conservés au redimensionnement. La pause suspend le mouvement, les échanges et les ondes ; « Nouvelle œuvre » renouvelle les grains et réinitialise le milieu.
 
 ## Sources
 
-- `index.html` : interface en français.
-- `src/style.css` : présentation et adaptation aux petits écrans.
-- `src/main.js` : dessin, rendu des pigments, modes et export PNG.
-- `src/living.mjs` : milieu de réaction-diffusion et interactions locales des pigments.
-- `tests/living.test.mjs` : propagation, affinités, échange de couleur, dépôts et redimensionnement.
-- `scripts/` : serveur local et construction, avec les modules natifs de Node.js.
-
-Le rendu utilise Canvas 2D, avec un plafond de 950 grains de pigment et une simulation à 30 pas par seconde. Des empreintes de pigment précalculées permettent de composer les lavis et leur granulation sans dépendance externe. Les couches colorées se superposent en mode multiplication ; les anciennes empreintes s’estompent selon le réglage Mémoire pour limiter la saturation de l’image.
-
-## Organisation de la matière
-
-Les formes s’inspirent de mécanismes d’organisation du vivant. Il s’agit d’une analogie artistique, pas d’une simulation biologique validée.
-
-- **Activation et ressources** : le geste ensemence un milieu de réaction-diffusion de type Gray–Scott. Une activation locale consomme une ressource qui se renouvelle et diffuse plus vite ; les concentrations créent des fronts et des motifs.
-- **Migration collective** : les pigments suivent les gradients du milieu, s’alignent avec leurs voisins et s’attirent selon leur affinité chromatique. Une répulsion à courte distance ménage des espaces dans les amas. Aucun vent global ne dicte leur trajectoire.
-- **Couleurs en contact** : les voisins échangent progressivement leur couleur. Les pigments éloignés conservent leur teinte ; les couleurs de la palette restent intactes.
-- **Condensation et dépôt** : les amas denses et les zones pauvres en ressources ralentissent la matière. Les concentrations d’activation dessinent des contours ; les dépôts laissent des filaments orientés par le déplacement. La largeur des lavis dépend de l’activité locale et de la diffusion, plutôt que d’une pulsation décorative.
-
-La simulation est plafonnée à 950 pigments. Le milieu est calculé sur une grille adaptative plafonnée à 160 × 120 cellules ; le cache des empreintes de couleur est borné. La pause suspend le milieu et les pigments, le redimensionnement conserve leurs états, et « Nouvelle œuvre » réinitialise aussi le milieu.
+- `index.html`, `src/style.css` : interface française adaptée aux petits écrans.
+- `src/main.js` : contacts, rendu des points, palettes et export PNG.
+- `src/living.mjs` : milieu, nuée, interactions locales et forces de contact.
+- `tests/living.test.mjs` : propagation, ressources, affinités, couleurs, stabilité, population initiale, gestes et ondes.
+- `scripts/` : serveur et construction avec les modules natifs de Node.js.

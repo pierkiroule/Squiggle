@@ -56,3 +56,37 @@ test('resize preserves the field and a new habitat clears it', () => {
   assert.ok(sampleHabitat(resized, 300, 200).signal > 0);
   assert.ok(createHabitat(600, 400).signal.every(v => v === 0));
 });
+
+test('surface is populated before touching and moves without a gesture', async () => {
+  const { createSwarm } = await import('../src/living.mjs');
+  let state = 123;
+  const random = () => ((state = (state * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+  const p = createSwarm(600, 400, 2200, random), h = createHabitat(600, 400);
+  assert.equal(p.length, 2200);
+  assert.ok(p.every(v => v.size < 1.2));
+  const before = p.map(v => [v.x, v.y]);
+  advancePigments(p, h, settings);
+  assert.ok(p.filter((v, i) => Math.hypot(v.x - before[i][0], v.y - before[i][1]) > .01).length > 2000);
+});
+
+test('gliding pushes a wake, holding attracts, and contact transfers only nearby color', async () => {
+  const { contactForce } = await import('../src/living.mjs');
+  const p = grain(120, [100, 100, 100]);
+  const touch = { x: 100, y: 100, vx: 0, vy: 0, age: 0, pressure: .5, color: [200, 30, 60] };
+  const glide = contactForce(p, [{ ...touch, vx: 5 }]);
+  const hold = contactForce(p, [{ ...touch, age: 600 }]);
+  assert.ok(glide.x > 0);
+  assert.ok(hold.x < 0);
+  assert.ok(hold.color[0] > 100 && hold.color[1] < 100);
+  assert.deepEqual(contactForce(grain(280, [100, 100, 100]), [touch]).color, [100, 100, 100]);
+});
+
+test('tap wave travels outwards then decays and is removed', async () => {
+  const { advanceWaves, contactForce } = await import('../src/living.mjs');
+  let waves = [{ x: 100, y: 100, radius: 0, strength: 1 }];
+  for (let i = 0; i < 6; i++) waves = advanceWaves(waves);
+  assert.ok(contactForce(grain(120, [100, 100, 100]), [], waves).x > 0);
+  assert.equal(contactForce(grain(280, [100, 100, 100]), [], waves).x, 0);
+  for (let i = 0; i < 150; i++) waves = advanceWaves(waves);
+  assert.equal(waves.length, 0);
+});
