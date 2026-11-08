@@ -1,184 +1,122 @@
-import { createGame, passTurn, recordFrame, createVisitor, stepVisitor, visitorDrawing } from './game.mjs';
-const $ = id => document.getElementById(id);
-const canvas = $('art'), ctx = canvas.getContext('2d');
-const COLORS = ['#354b41', '#426d9b', '#a85a70', '#bc7644', '#8070a0', '#4f918d', '#252a32', '#d2a64c'];
-const WIDTH = 1200, HEIGHT = 760, VISIT_STEPS = 120;
-let game = null, strokes = [], current = null, pointer = null, frames = [], colors = [];
-let tool = 'pen', visitor = null, visitStep = 0, visitAccumulator = 0, last = 0;
-let playing = false, replayAccumulator = 0, frameIndex = 0, recordClock = 0;
-let shown = [], turnStart = 0;
-
-function fit() {
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(devicePixelRatio || 1, 2);
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  render(shown);
-}
-// A fixed sheet, letterboxed when needed, preserves every drawing coordinate.
-function transform() {
-  const scale = Math.min(canvas.width / WIDTH, canvas.height / HEIGHT);
-  return { scale, x: (canvas.width - WIDTH * scale) / 2, y: (canvas.height - HEIGHT * scale) / 2 };
-}
-function render(drawing = strokes) {
-  shown = drawing;
-  const t = transform();
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#e9e6de'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.setTransform(t.scale, 0, 0, t.scale, t.x, t.y);
-  ctx.fillStyle = '#faf9f5'; ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, WIDTH, HEIGHT); ctx.clip();
-  for (const stroke of drawing) {
-    ctx.globalCompositeOperation = stroke.tool === 'eraser' ? 'destination-out' : 'source-over';
-    ctx.strokeStyle = stroke.color; ctx.fillStyle = stroke.color;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    const points = stroke.points;
-    if (points.length === 1) { ctx.beginPath(); ctx.arc(points[0].x, points[0].y, stroke.width * points[0].pressure / 2, 0, Math.PI * 2); ctx.fill(); }
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineWidth = stroke.width * (points[i].pressure + points[i - 1].pressure) / 2;
-      ctx.beginPath(); ctx.moveTo(points[i - 1].x, points[i - 1].y); ctx.lineTo(points[i].x, points[i].y); ctx.stroke();
+import { createInk, seedInk, stepInk, touchInk, snapshot, prepareMorph, morphInk, renderInk, PALETTES } from './ink.mjs';
+const $ = id => document.getElementById(id), canvas = $('art'), ctx = canvas.getContext('2d', { alpha:false });
+const W = 280, H = 194;
+const layer = document.createElement('canvas'); layer.width = W; layer.height = H;
+const g = layer.getContext('2d'), image = g.createImageData(W,H);
+const grain = document.createElement('canvas'), grainCtx = grain.getContext('2d');
+let ink = createInk(W,H,Math.random()*20); seedInk(ink);
+let palette = 0, selected = 0, mirror = false, paused = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let contact = null, pointer = null, states = [], morphs = new Map(), output = createInk(W,H), displayed = ink;
+let replay = false, playing = false, position = 0, last = 0, accumulator = 0, recorder = null, chunks = [], exporting = false;
+function draw(s = displayed) {
+  displayed = s; renderInk(s,image.data,s.relief ?? Number($('relief').value)/100); g.putImageData(image,0,0);
+  ctx.drawImage(layer,0,0,canvas.width,canvas.height);
+  ctx.save(); ctx.scale(canvas.width/W,canvas.height/H);
+  const levels=[.028,.052,.1,.18,.3,.48,.72,1.05];
+  const density=new Float32Array(W*H);
+  let minX=W-1,maxX=0,minY=H-1,maxY=0;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;density[i]=(s.r[i]+s.g[i]+s.b[i])/3;if(density[i]>.018){minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}}
+  minX=Math.max(0,minX-1);maxX=Math.min(W-2,maxX+1);minY=Math.max(0,minY-1);maxY=Math.min(H-2,maxY+1);
+  for(const level of levels){
+    ctx.beginPath();
+    for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++){
+      const i=y*W+x;
+      const a=density[i],b=density[i+1],c=density[i+W+1],d=density[i+W];
+      if(Math.min(a,b,c,d)>level||Math.max(a,b,c,d)<level)continue;
+      const values=[a,b,c,d];
+      const hits=[];
+      const corners=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]];
+      for(let k=0;k<4;k++){const j=(k+1)%4;if((values[k]<level)!==(values[j]<level)){const t=(level-values[k])/(values[j]-values[k]);hits.push([corners[k][0]+(corners[j][0]-corners[k][0])*t,corners[k][1]+(corners[j][1]-corners[k][1])*t]);}}
+      for(let k=0;k+1<hits.length;k+=2){ctx.moveTo(...hits[k]);ctx.lineTo(...hits[k+1]);}
     }
+    ctx.strokeStyle=level<.08?'rgba(79,64,63,.24)':'rgba(68,49,62,.11)';ctx.lineWidth=level<.08?.18:.09;ctx.stroke();
   }
-  ctx.restore(); ctx.globalCompositeOperation = 'source-over';
-  // Fill erased areas behind all marks without covering later strokes.
-  ctx.globalCompositeOperation = 'destination-over'; ctx.fillStyle = '#faf9f5'; ctx.fillRect(0, 0, WIDTH, HEIGHT); ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha=.12; ctx.globalCompositeOperation='multiply'; ctx.drawImage(grain,0,0); ctx.restore();
 }
-function label() { return game.phase === 'living' ? 'Le vivant s’invite' : `Joueur ${game.current + 1} · passage ${game.turn}/${game.total}`; }
-function capture(drawing = strokes, text = label()) { frames = recordFrame(frames, drawing, text); }
-function swatches() {
+function resize() {
+  const r=canvas.getBoundingClientRect(), dpr=Math.min(devicePixelRatio||1,2);
+  canvas.width=Math.max(1,Math.round(r.width*dpr)); canvas.height=Math.max(1,Math.round(r.height*dpr));
+  grain.width=canvas.width; grain.height=canvas.height;
+  const pixels=grainCtx.createImageData(grain.width,grain.height);
+  for(let i=0;i<pixels.data.length;i+=4){const value=210+Math.random()*45;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=value;pixels.data[i+3]=255;}
+  grainCtx.putImageData(pixels,0,0);draw();
+}
+function swatches(){
   $('swatches').replaceChildren();
-  COLORS.forEach((color, i) => {
-    const button = document.createElement('button'); button.type = 'button'; button.className = 'swatch';
-    button.style.setProperty('--swatch', color); button.setAttribute('aria-label', ['Forêt', 'Bleu', 'Garance', 'Sienne', 'Violet', 'Lagon', 'Graphite', 'Ocre'][i]);
-    button.setAttribute('aria-pressed', String(colors[game.current] === color));
-    button.onclick = () => { finishStroke(); colors[game.current] = color; setTool('pen'); swatches(); };
-    button.disabled = game.phase !== 'drawing'; $('swatches').append(button);
-  });
+  PALETTES[palette].colors.forEach((color,i)=>{const b=document.createElement('button');b.type='button';b.className='swatch';b.style.setProperty('--color',color);b.setAttribute('aria-label',`${PALETTES[palette].name}, pigment ${i+1}`);b.setAttribute('aria-pressed',String(i===selected));b.disabled=replay;b.onclick=()=>{selected=i;swatches();};$('swatches').append(b);});
 }
-function setTool(value) {
-  tool = value;
-  for (const id of ['pen', 'eraser']) { $(id).classList.toggle('active', id === value); $(id).setAttribute('aria-pressed', String(id === value)); }
+function modeUI(){
+  $('mode').textContent=replay?'LES RÉSONANCES SE MÉTAMORPHOSENT':paused?'L’ENCRE EST SUSPENDUE':'L’ENCRE EST VIVANTE';
+  $('pause').textContent=paused?'Réveiller':'Suspendre';$('pause').setAttribute('aria-pressed',String(paused));
+  for(const id of ['palette','size','activity','relief','mirror','pause','resonate'])$(id).disabled=replay;
+  $('resonate').disabled=replay||states.length>=24;
+  $('playback').hidden=!replay;$('play').textContent=playing?'Ⅱ Pause':'▶ Lire';
+  $('animate').disabled=states.length<2||exporting;$('count').textContent=states.length;$('empty').hidden=states.length>0;
+  for(const id of ['timeline','duration','return','reset','play'])$(id).disabled=exporting;
+  $('video').disabled=exporting||states.length<2||!window.MediaRecorder||!canvas.captureStream;
+  $('play').disabled=exporting||states.length<2; $('timeline').disabled=exporting||states.length<2;
+  swatches();
 }
-function updateUI() {
-  const living = game.phase === 'living', finished = game.phase === 'finished';
-  $('chapter').textContent = finished ? 'LE FILM DE VOTRE RENCONTRE' : `PASSAGE ${game.turn} / ${game.total}`;
-  $('turn').textContent = finished ? 'Votre rêve à plusieurs' : living ? 'Le vivant prend la main' : `À toi, joueur ${game.current + 1}`;
-  $('invitation').textContent = finished ? `${game.visits} visite${game.visits === 1 ? '' : 's'} du vivant · ${frames.length} instants à revoir` : living ? 'Les traits se cherchent, s’accordent et se transforment. Puis ce sera à vous.' : 'Dessine autant que tu veux, puis passe la main.';
-  $('visitor-badge').hidden = !living;
-  $('drawing-controls').hidden = finished; $('replay-controls').hidden = !finished;
-  for (const id of ['pen', 'eraser', 'size', 'pass', 'undo', 'finish']) $(id).disabled = living;
-  $('undo').disabled = living || strokes.length <= turnStart;
-  $('pass').textContent = game.turn === game.total ? 'Terminer la rencontre →' : 'Passer la main →';
-  if (!finished) swatches();
+function dab(x,y,dx=0,dy=0,pressure=1){
+  const color=PALETTES[palette].colors[selected],radius=Number($('size').value);
+  touchInk(ink,x,y,color,radius,dx,dy,pressure);
+  if(mirror)touchInk(ink,W-x,y,color,radius,-dx,dy,pressure);
 }
-function start() {
-  game = createGame(Number($('players').value), Number($('rounds').value));
-  strokes = []; frames = []; current = null; pointer = null; visitor = null; playing = false; turnStart = 0;
-  colors = Array.from({ length: game.players }, (_, i) => COLORS[i % COLORS.length]);
-  setTool('pen'); $('setup').hidden = true; $('studio').hidden = false;
-  capture([], 'La feuille attend votre premier geste'); fit(); render(); updateUI();
+function point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H,pressure:e.pointerType==='pen'?Math.max(.1,e.pressure):.65};}
+function release(){contact=null;const id=pointer;pointer=null;if(id!==null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
+canvas.addEventListener('pointerdown',e=>{if(replay||pointer!==null||(e.pointerType==='mouse'&&e.button!==0))return;e.preventDefault();pointer=e.pointerId;canvas.setPointerCapture(pointer);contact=point(e);dab(contact.x,contact.y,0,0,contact.pressure);draw(ink);});
+canvas.addEventListener('pointermove',e=>{if(pointer!==e.pointerId||!contact)return;e.preventDefault();for(const p of e.getCoalescedEvents?.().length?e.getCoalescedEvents():[e]){const next=point(p),dx=next.x-contact.x,dy=next.y-contact.y,n=Math.max(1,Math.ceil(Math.hypot(dx,dy)/2));for(let i=1;i<=n;i++)dab(contact.x+dx*i/n,contact.y+dy*i/n,dx/n,dy/n,next.pressure);contact=next;}draw(ink);});
+for(const name of ['pointerup','pointercancel','lostpointercapture'])canvas.addEventListener(name,e=>{if(pointer===e.pointerId)release();});
+$('palette').onchange=()=>{palette=Number($('palette').value);selected=0;swatches();};
+$('mirror').onclick=()=>{mirror=!mirror;$('mirror').setAttribute('aria-pressed',String(mirror));};
+$('pause').onclick=()=>{paused=!paused;modeUI();};$('relief').oninput=()=>draw();
+function stateCards(){
+  $('states').replaceChildren();
+  states.forEach((state,i)=>{const card=document.createElement('div');card.className='state';const b=document.createElement('button');b.type='button';b.setAttribute('aria-label',`Contempler la résonance ${i+1}`);const img=document.createElement('img');img.src=state.thumbnail;img.alt=`Encre de la résonance ${i+1}`;b.append(img);b.disabled=exporting;b.onclick=()=>{release();replay=true;playing=false;position=i;showPosition();modeUI();};const label=document.createElement('p');label.textContent=`${String(i+1).padStart(2,'0')} · Ça résonne`;const remove=document.createElement('button');remove.className='remove';remove.textContent='×';remove.setAttribute('aria-label',`Supprimer la résonance ${i+1}`);remove.disabled=exporting;remove.onclick=()=>{states.splice(i,1);morphs.clear();playing=false;position=Math.min(position,Math.max(0,states.length-1));if(states.length<2){replay=false;draw(ink);}else if(replay)showPosition();stateCards();modeUI();};card.append(b,remove,label);$('states').append(card);});modeUI();
 }
-function point(e) {
-  const rect = canvas.getBoundingClientRect(), t = transform();
-  return { x: Math.max(0, Math.min(WIDTH, ((e.clientX - rect.left) * canvas.width / rect.width - t.x) / t.scale)),
-    y: Math.max(0, Math.min(HEIGHT, ((e.clientY - rect.top) * canvas.height / rect.height - t.y) / t.scale)),
-    pressure: e.pointerType === 'pen' ? Math.max(.2, e.pressure) : 1 };
-}
-function finishStroke() {
-  if (current) { strokes = [...strokes, current]; current = null; capture(); updateUI(); }
-  const id = pointer; pointer = null;
-  if (id !== null && canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
-}
-canvas.addEventListener('pointerdown', e => {
-  if (!game || game.phase !== 'drawing' || pointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
-  const rect = canvas.getBoundingClientRect(), t = transform();
-  const x = (e.clientX - rect.left) * canvas.width / rect.width, y = (e.clientY - rect.top) * canvas.height / rect.height;
-  if (x < t.x || x > t.x + WIDTH * t.scale || y < t.y || y > t.y + HEIGHT * t.scale) return;
-  e.preventDefault(); pointer = e.pointerId; canvas.setPointerCapture(pointer);
-  current = { player: game.current, color: colors[game.current], width: Number($('size').value) * (tool === 'eraser' ? 3 : 1), tool, points: [point(e)] };
-  recordClock = 0; render([...strokes, current]);
-});
-canvas.addEventListener('pointermove', e => {
-  if (!current || e.pointerId !== pointer) return;
-  e.preventDefault();
-  for (const sample of e.getCoalescedEvents?.().length ? e.getCoalescedEvents() : [e]) {
-    const p = point(sample), previous = current.points.at(-1);
-    if (Math.hypot(p.x - previous.x, p.y - previous.y) > .8) {
-      // Bounded sampling for long gestures, without limiting their duration.
-      if (current.points.length >= 1200) current.points = current.points.filter((_, i) => i % 2 === 0);
-      current.points.push(p);
-    }
-  }
-  render([...strokes, current]);
-});
-canvas.addEventListener('pointerup', e => { if (pointer === e.pointerId) { if (current) current.points.push(point(e)); finishStroke(); render(); } });
-for (const name of ['pointercancel', 'lostpointercapture']) canvas.addEventListener(name, e => { if (pointer === e.pointerId) { finishStroke(); render(); } });
-function end() {
-  finishStroke(); game = { ...game, phase: 'finished' }; visitor = null; capture(strokes, 'Le dessin de votre rencontre');
-  $('timeline').max = frames.length - 1; frameIndex = frames.length - 1; $('timeline').value = frameIndex;
-  playing = false; $('play').textContent = '▶ Rejouer le rêve'; render(); updateUI();
-}
-$('setup-form').onsubmit = e => { e.preventDefault(); start(); };
-$('pen').onclick = () => { finishStroke(); setTool('pen'); };
-$('eraser').onclick = () => { finishStroke(); setTool('eraser'); };
-$('undo').onclick = () => { finishStroke(); if (strokes.length > turnStart) { strokes = strokes.slice(0, -1); capture(); render(); updateUI(); } };
-$('pass').onclick = () => {
-  finishStroke(); capture(); game = passTurn(game, strokes.some(s => s.tool !== 'eraser'));
-  if (game.phase === 'finished') { end(); return; }
-  if (game.phase === 'living') { visitor = createVisitor(strokes, WIDTH, HEIGHT, Math.random() * 20); visitStep = 0; visitAccumulator = 0; }
-  turnStart = strokes.length; setTool('pen'); updateUI();
+$('resonate').onclick=()=>{
+  release();if(replay||states.length>=24)return;
+  const thumbnail=document.createElement('canvas');thumbnail.width=224;thumbnail.height=150;thumbnail.getContext('2d').drawImage(canvas,0,0,224,150);
+  states.push({ink:{...snapshot(ink),relief:Number($('relief').value)/100},thumbnail:thumbnail.toDataURL('image/png')});stateCards();
+  $('invitation').textContent=`Résonance ${states.length} retenue. La rencontre peut continuer.`;
 };
-$('finish').onclick = end;
-$('play').onclick = () => {
-  if (frameIndex === frames.length - 1) frameIndex = 0;
-  playing = !playing; replayAccumulator = 0; $('play').textContent = playing ? 'Ⅱ Pause' : '▶ Reprendre'; showFrame();
-};
-function showFrame() {
-  $('timeline').value = frameIndex; $('caption').textContent = `${frames[frameIndex].label} · ${frameIndex + 1} / ${frames.length}`;
-  render(frames[frameIndex].strokes);
+function showPosition(){
+  const i=Math.min(Math.floor(position),states.length-1),t=position-i;
+  if(t<.00001||i===states.length-1)draw(states[i].ink);
+  else{if(!morphs.has(i))morphs.set(i,prepareMorph(states[i].ink,states[i+1].ink));draw(morphInk(morphs.get(i),t,output));}
+  $('timeline').value=Math.round(position/Math.max(1,states.length-1)*1000);
+  $('invitation').textContent=`Résonance ${Math.min(i+1,states.length)} → ${Math.min(i+2,states.length)} · ${states.length} états`;
 }
-$('timeline').oninput = () => { playing = false; $('play').textContent = '▶ Reprendre'; frameIndex = Number($('timeline').value); showFrame(); };
-$('new').onclick = () => { if (game) $('restart-dialog').showModal(); };
-$('cancel-new').onclick = () => $('restart-dialog').close();
-$('confirm-new').onclick = () => {
-  finishStroke(); game = null; visitor = null; strokes = []; frames = []; shown = []; playing = false;
-  $('restart-dialog').close(); $('studio').hidden = true; $('setup').hidden = false;
-  $('caption').textContent = 'Vos gestes sont libres. Aucune interprétation automatique.';
+function begin(){if(states.length<2)return;release();replay=true;playing=true;position=0;accumulator=0;showPosition();modeUI();}
+$('animate').onclick=begin;
+$('play').onclick=()=>{if(position>=states.length-1)position=0;playing=!playing;showPosition();modeUI();};
+$('timeline').oninput=()=>{playing=false;position=Number($('timeline').value)/1000*(states.length-1);showPosition();modeUI();};
+$('return').onclick=()=>{replay=false;playing=false;draw(ink);modeUI();$('invitation').textContent='Tracez dans la matière. Laissez-la vous répondre.';};
+function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+$('save').onclick=()=>canvas.toBlob(blob=>{if(blob)download(blob,'encre-resonance.png');},'image/png');
+$('video').onclick=()=>{
+  if(states.length<2||exporting)return;
+  const mime=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(type=>MediaRecorder.isTypeSupported(type));
+  if(!mime){$('export-status').textContent='L’export vidéo n’est pas disponible dans ce navigateur.';return;}
+  try{
+    const stream=canvas.captureStream(30);chunks=[];recorder=new MediaRecorder(stream,{mimeType:mime});
+    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
+    recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());if(chunks.length)download(new Blob(chunks,{type:mime}),'encre-resonances.webm');exporting=false;recorder=null;$('export-status').textContent='Animation exportée en WebM.';stateCards();};
+    recorder.onerror=()=>{$('export-status').textContent='L’export vidéo a échoué. Réessayez.';if(recorder?.state!=='inactive')recorder.stop();};
+    exporting=true;begin();stateCards();recorder.start(200);$('export-status').textContent='Enregistrement de la métamorphose… gardez cette page ouverte.';
+  }catch{exporting=false;recorder=null;$('export-status').textContent='Impossible de démarrer l’export dans ce navigateur.';modeUI();}
 };
-$('save').onclick = () => {
-  const out = document.createElement('canvas'); out.width = WIDTH; out.height = HEIGHT;
-  const t = transform(); const g = out.getContext('2d'); g.fillStyle = '#faf9f5'; g.fillRect(0, 0, WIDTH, HEIGHT);
-  g.drawImage(canvas, t.x, t.y, WIDTH * t.scale, HEIGHT * t.scale, 0, 0, WIDTH, HEIGHT);
-  out.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = 'squiggle-rencontre.png'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000); }, 'image/png');
-};
-function animate(now) {
-  const dt = Math.min(now - (last || now), 80); last = now;
-  if (!document.hidden && game) {
-    if (game.phase === 'living') {
-      visitAccumulator += dt;
-      while (visitAccumulator >= 1000 / 30 && visitStep < VISIT_STEPS) {
-        stepVisitor(visitor); visitStep++; visitAccumulator -= 1000 / 30;
-        if (visitStep % 6 === 0) capture(visitorDrawing(visitor));
-      }
-      render(visitorDrawing(visitor));
-      if (visitStep === VISIT_STEPS) {
-        strokes = visitorDrawing(visitor); visitor = null; game = { ...game, phase: 'drawing' };
-        turnStart = strokes.length; capture(strokes, `Le vivant laisse la main au joueur ${game.current + 1}`); updateUI();
-      }
-    } else if (current) {
-      recordClock += dt;
-      if (recordClock > 220) { capture([...strokes, { ...current, points: current.points.map(p => ({ ...p })) }]); recordClock = 0; }
-    } else if (game.phase === 'finished' && playing) {
-      replayAccumulator += dt;
-      if (replayAccumulator >= Number($('speed').value)) {
-        replayAccumulator = 0; frameIndex = Math.min(frameIndex + 1, frames.length - 1); showFrame();
-        if (frameIndex === frames.length - 1) { playing = false; $('play').textContent = '↻ Rejouer le rêve'; }
-      }
-    }
+$('reset').onclick=()=>$('reset-dialog').showModal();$('cancel-reset').onclick=()=>$('reset-dialog').close();
+$('confirm-reset').onclick=()=>{release();states=[];morphs.clear();replay=false;playing=false;ink=createInk(W,H,Math.random()*20);seedInk(ink,PALETTES[palette].colors);draw(ink);stateCards();$('reset-dialog').close();$('invitation').textContent='Une nouvelle matière. Une nouvelle rencontre.';};
+function animate(now){
+  const dt=Math.min(now-(last||now),70);last=now;
+  if(!document.hidden){
+    if(replay&&playing){position=Math.min(states.length-1,position+dt/Number($('duration').value));showPosition();if(position===states.length-1){playing=false;if(exporting&&recorder?.state==='recording')recorder.stop();modeUI();}}
+    else if(!replay&&!paused){accumulator+=dt;if(accumulator>=50){accumulator=0;if(contact)dab(contact.x,contact.y,0,0,contact.pressure*.18);stepInk(ink,Number($('activity').value)/100);draw(ink);}}
   }
   requestAnimationFrame(animate);
 }
-new ResizeObserver(() => { if (game) fit(); }).observe($('paper'));
-document.addEventListener('visibilitychange', () => { if (document.hidden) finishStroke(); last = 0; });
-window.addEventListener('blur', finishStroke);
-requestAnimationFrame(animate);
+new ResizeObserver(resize).observe($('paper'));
+document.addEventListener('visibilitychange',()=>{if(document.hidden)release();last=0;});window.addEventListener('blur',release);
+modeUI();resize();requestAnimationFrame(animate);

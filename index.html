@@ -1,47 +1,37 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f1eee6">
-  <meta name="description" content="Un cadavre exquis dessiné à plusieurs, où le vivant s’invite. Rejouez votre partie en stop motion.">
-  <title>Le Squiggle du Vivant •°</title>
-  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./src/style.css">
-  <script type="module" src="./src/main.js"></script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="theme-color" content="#ede8de">
+<meta name="description" content="Une encre vivante avec laquelle dessiner. Gardez les états qui résonnent et faites naître un morphing entre eux.">
+<title>Le Squiggle du Vivant •°</title><link rel="icon" href="./favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./src/style.css"><script type="module" src="./src/main.js"></script>
 </head>
 <body>
-  <header><div><h1>Le Squiggle du Vivant <span>•°</span></h1><p>Un cadavre exquis, avec un invité inattendu.</p></div><button id="new" type="button">Nouvelle partie</button></header>
-  <main>
-    <section id="setup" class="card" aria-labelledby="setup-title">
-      <p class="eyebrow">À plusieurs, sur le même écran</p>
-      <h2 id="setup-title">Un trait à toi.<br>Une surprise au vivant.</h2>
-      <p>Dessinez à tour de rôle. L’application passe la main. Parfois, le vivant s’invite, anime vos traits quelques secondes et vous laisse poursuivre leur métamorphose.</p>
-      <form id="setup-form">
-        <label for="players">Nombre de joueurs <input id="players" type="number" min="1" max="8" value="2" required></label>
-        <label for="rounds">Passages par joueur <select id="rounds"><option value="2">2 · petite rencontre</option><option value="3" selected>3 · promenade</option><option value="5">5 · long rêve</option></select></label>
-        <button class="primary" type="submit">Commencer la rencontre →</button>
-      </form>
-      <small>À la fin, revivez votre dessin en stop motion. Tout reste dans ce navigateur, jusqu’à la fermeture de la page.</small>
-    </section>
-    <section id="studio" hidden aria-label="Atelier de dessin">
-      <div class="turn-bar"><div><span class="eyebrow" id="chapter">LA RENCONTRE</span><h2 id="turn" aria-live="polite"></h2></div><p id="invitation" role="status"></p></div>
-      <div id="paper"><canvas id="art" aria-label="Feuille de dessin. Dessinez au doigt, au stylet ou à la souris."></canvas><div id="visitor-badge" hidden>✺ Le vivant traverse votre dessin…</div></div>
-      <div id="drawing-controls" class="toolbar">
-        <div id="swatches" role="group" aria-label="Couleur du trait"></div>
-        <label class="size" for="size">Épaisseur <input id="size" type="range" min="1" max="24" value="4"></label>
-        <button id="pen" class="active" aria-pressed="true" type="button">Crayon</button><button id="eraser" aria-pressed="false" type="button">Gomme</button><button id="undo" type="button">Annuler</button>
-        <button id="pass" class="primary" type="button">Passer la main →</button><button id="finish" type="button">Terminer</button>
-      </div>
-      <div id="replay-controls" class="toolbar" hidden>
-        <button id="play" class="primary" type="button">▶ Rejouer le rêve</button><label class="timeline" for="timeline">La partie <input id="timeline" type="range" min="0" max="0" value="0"></label>
-        <label for="speed">Rythme <select id="speed"><option value="700">Contemplatif</option><option value="260" selected>Stop motion</option><option value="110">Rapide</option></select></label>
-        <button id="save" type="button">Image PNG</button>
-      </div>
-      <p id="caption">Vos gestes sont libres. Aucune interprétation automatique.</p>
-    </section>
-  </main>
-  <dialog id="restart-dialog"><h2>Recommencer une rencontre ?</h2><p>La partie et son film seront effacés. Vous pouvez d’abord conserver une image du dessin terminé.</p><div class="toolbar"><button id="cancel-new" type="button">Continuer cette partie</button><button id="confirm-new" class="primary" type="button">Nouvelle partie</button></div></dialog>
-  <noscript>Activez JavaScript pour dessiner et jouer.</noscript>
-</body>
-</html>
+<header><div><p class="eyebrow">LE SQUIGGLE DU VIVANT •°</p><h1>Une matière. Une rencontre.</h1></div><button id="reset" type="button">Nouvelle encre</button></header>
+<main>
+<section class="atelier" aria-label="Surface d’encre vivante">
+<div class="surface-heading"><span id="mode">L’ENCRE EST VIVANTE</span><p id="invitation" role="status">Tracez dans la matière. Laissez-la vous répondre.</p></div>
+<div id="paper"><canvas id="art" aria-label="Surface d’encre vivante. Tracez au doigt, au stylet ou à la souris."></canvas><span class="signature" aria-hidden="true">ce qui apparaît vous appartient •°</span></div>
+<div class="tools">
+<label for="palette" class="select-label">Pigments<select id="palette"><option value="0">Abysses</option><option value="1">Incandescence</option><option value="2">Sous-bois</option></select></label>
+<div id="swatches" role="group" aria-label="Couleur du pigment"></div>
+<label for="size">Geste<input id="size" type="range" min="3" max="22" value="9"></label>
+<label for="activity">Souffle<input id="activity" type="range" min="0" max="100" value="55"></label>
+<label for="relief">Relief<input id="relief" type="range" min="0" max="100" value="55"></label>
+<button id="mirror" aria-pressed="false" type="button">Miroir</button><button id="pause" aria-pressed="false" type="button">Suspendre</button>
+<button id="resonate" class="primary" type="button">✧ Ça résonne</button>
+</div>
+</section>
+<section class="resonances" aria-labelledby="resonances-title">
+<div class="section-title"><div><p class="eyebrow">RETENIR CE QUI NOUS TOUCHE</p><h2 id="resonances-title">Les résonances <span id="count">0</span></h2></div><button id="animate" class="dark" type="button" disabled>Animer les résonances →</button></div>
+<p id="empty">Un état vous parle ? « Ça résonne » le garde ici. Dès deux états, faites naître leur métamorphose.</p>
+<div id="states" aria-label="États sauvegardés"></div>
+<div id="playback" hidden>
+<div class="playback-row"><button id="play" type="button">Ⅱ Pause</button><label class="scrub" for="timeline">Métamorphose<input id="timeline" type="range" min="0" max="1000" value="0"></label><label for="duration">Transition<select id="duration"><option value="2500">2,5 s</option><option value="4500" selected>4,5 s</option><option value="7000">7 s</option></select></label><button id="return" type="button">Revenir à l’encre</button></div>
+<div class="export-row"><button id="save" type="button">Image PNG</button><button id="video" type="button">Exporter l’animation</button><span id="export-status" role="status"></span></div>
+</div>
+<p class="note">Une expérience de projection libre, sans interprétation automatique. Les états restent dans cette page ; rechargez-la et ils disparaissent. Exportez vos images ou votre animation pour les conserver.</p>
+</section>
+</main>
+<dialog id="reset-dialog"><h2>Une nouvelle rencontre ?</h2><p>L’encre et les résonances de cette page seront effacées.</p><div class="playback-row"><button id="cancel-reset" type="button">Garder cette rencontre</button><button id="confirm-reset" class="primary" type="button">Nouvelle encre</button></div></dialog>
+<noscript>Activez JavaScript pour rencontrer l’encre vivante.</noscript>
+</body></html>
