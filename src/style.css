@@ -103,3 +103,21 @@ noscript { position: fixed; inset: 30% 20px auto; text-align: center; }
   #help { margin-top: 5px; }
   button { padding: 7px 12px; min-height: 32px; }
 }
+
+.pigment-palette { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px; margin: 12px auto 0; }
+.pigment-palette > label { font-size: 10px; color: #728075; }
+select { color: var(--ink); background: #faf9f5; border: 1px solid #c8cec5; border-radius: 20px; padding: 9px 12px; font: inherit; font-size: 12px; }
+#swatches { display: flex; gap: 4px; }
+.swatch { min-height: 36px; width: 36px; padding: 5px; background: transparent; border: 1px solid transparent; display: grid; place-items: center; }
+.swatch::before { content: ""; width: 24px; height: 24px; border-radius: 50%; background: var(--swatch); box-shadow: inset 0 0 6px #ffffff55; }
+.swatch[aria-pressed=true] { border-color: var(--swatch); background: #ffffff80; }
+select:focus-visible { outline: 2px solid #4e705d; outline-offset: 3px; }
+@media (max-width: 480px) {
+  .pigment-palette { gap: 5px; max-width: 360px; }
+  .pigment-palette > label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .swatch { width: 30px; min-height: 34px; padding: 2px; }
+  .swatch::before { width: 22px; height: 22px; }
+  #mirror { padding: 8px 10px; }
+  .settings { gap: 12px; }
+}
+@media (max-height: 540px) { footer { max-height: 55vh; overflow-y: auto; } }

@@ -15,20 +15,31 @@
 
   <header>
     <h1>Le Squiggle du Vivant •°</h1>
-    <p>Ce que nous traçons prend vie.</p>
+    <p>Des pigments, des nuages, des formes à imaginer.</p>
   </header>
 
   <div id="status" aria-hidden="true"></div>
 
   <footer>
     <div id="invitation" aria-live="polite">
-      Dessinez librement. Puis laissez la forme vous surprendre.
+      Déposez une couleur. Laissez émerger ce que vous y voyez.
     </div>
 
     <div class="controls" role="group" aria-label="Participation">
       <button id="patient" class="active" type="button" aria-pressed="true">Patient</button>
       <button id="psy" type="button" aria-pressed="false">Psychologue</button>
       <button id="observe" type="button" aria-pressed="false">Observer</button>
+    </div>
+
+    <div class="pigment-palette">
+      <label for="palette">Harmonie</label>
+      <select id="palette" aria-label="Harmonie de couleurs">
+        <option value="0">Nébuleuse</option>
+        <option value="1">Terres vivantes</option>
+        <option value="2">Marées</option>
+      </select>
+      <div id="swatches" role="group" aria-label="Couleur du pigment"></div>
+      <button id="mirror" type="button" aria-pressed="false" title="Déposer le geste des deux côtés ; les pigments évoluent ensuite librement">Miroir</button>
     </div>
 
     <div class="settings">
@@ -41,8 +52,12 @@
         <input id="wild" type="range" min="0" max="100" value="62">
       </label>
       <label for="pigment">
-        Encre
+        Pigment
         <input id="pigment" type="range" min="10" max="100" value="70">
+      </label>
+      <label for="diffusion">
+        Diffusion
+        <input id="diffusion" type="range" min="0" max="100" value="55">
       </label>
     </div>
 
@@ -52,7 +67,7 @@
       <button id="reset" type="button">Nouvelle œuvre</button>
     </div>
 
-    <div id="help">Aucun dessin n'est interprété automatiquement.</div>
+    <div id="help">Des formes à imaginer, sans interprétation automatique.</div>
   </footer>
 
   <noscript>Activez JavaScript pour dessiner et laisser les formes prendre vie.</noscript>

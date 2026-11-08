@@ -9,9 +9,14 @@ const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const PAPER = "#f1eee6";
 const PALETTES = [
-  [[39, 61, 52], [74, 112, 90], [109, 132, 115], [156, 111, 91]],
-  [[66, 76, 102], [107, 107, 137], [151, 124, 130], [180, 143, 107]]
+  { name: "Nébuleuse", colors: [[63, 72, 142], [130, 77, 151], [209, 102, 126], [228, 156, 88], [63, 137, 148], [86, 98, 112]], labels: ["Outremer", "Améthyste", "Rose garance", "Ocre solaire", "Bleu lagon", "Gris de Payne"] },
+  { name: "Terres vivantes", colors: [[132, 64, 49], [191, 113, 65], [202, 160, 74], [91, 117, 82], [53, 106, 112], [100, 73, 93]], labels: ["Sienne", "Argile", "Ocre", "Mousse", "Pétrole", "Prune"] },
+  { name: "Marées", colors: [[40, 80, 121], [45, 131, 151], [96, 157, 147], [153, 115, 165], [206, 127, 113], [107, 122, 142]], labels: ["Abysses", "Céruléen", "Écume", "Brume violette", "Corail", "Ardoise"] }
 ];
+let paletteIndex = 0;
+const selectedColors = [0, 2];
+let mirrored = false;
+let diffusion = .55;
 
 const MAX_PARTICLES = 950;
 const CELL = 38;
@@ -41,6 +46,39 @@ function makeLayer() {
 
 const traces = makeLayer();
 const gesture = makeLayer();
+const paper = makeLayer();
+const stamps = new Map();
+
+// Reusable translucent pigment grains: soft wash, irregular edges, sediment.
+function pigmentStamp(color) {
+  const key = color.join(",");
+  if (stamps.has(key)) return stamps.get(key);
+  const stamp = document.createElement("canvas");
+  stamp.width = stamp.height = 96;
+  const g = stamp.getContext("2d");
+  const wash = g.createRadialGradient(48, 48, 2, 48, 48, 46);
+  wash.addColorStop(0, rgba(color, .28));
+  wash.addColorStop(.45, rgba(color, .15));
+  wash.addColorStop(.78, rgba(color, .045));
+  wash.addColorStop(1, rgba(color, 0));
+  g.fillStyle = wash;
+  g.fillRect(0, 0, 96, 96);
+  for (let i = 0; i < 150; i++) {
+    const angle = rand(0, TAU), radius = Math.sqrt(Math.random()) * 39;
+    g.fillStyle = rgba(color, rand(.025, .13));
+    g.fillRect(48 + Math.cos(angle) * radius, 48 + Math.sin(angle) * radius, rand(.4, 1.5), rand(.4, 1.5));
+  }
+  stamps.set(key, stamp);
+  return stamp;
+}
+
+function dab(g, x, y, size, color, alpha = 1) {
+  g.save();
+  g.globalAlpha = alpha;
+  g.drawImage(pigmentStamp(color), x - size, y - size, size * 2, size * 2);
+  g.restore();
+}
+
 
 function rgba(c, a) {
   return `rgba(${c[0]},${c[1]},${c[2]},${clamp(a, 0, 1)})`;
@@ -91,6 +129,14 @@ function resize() {
     }
   }
 
+  paper.canvas.width = W;
+  paper.canvas.height = H;
+  paper.ctx.fillStyle = PAPER;
+  paper.ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < W * H / 35; i++) {
+    paper.ctx.fillStyle = `rgba(95,74,59,${rand(.015, .055)})`;
+    paper.ctx.fillRect(rand(0, W), rand(0, H), 1, 1);
+  }
   render();
 }
 
@@ -105,7 +151,7 @@ function flow(x, y, t) {
 }
 
 function colorFor(r, index) {
-  return PALETTES[r][index % 4];
+  return PALETTES[paletteIndex].colors[(selectedColors[r] + index) % 6];
 }
 
 function makeParticle(x, y, stroke, index) {
@@ -120,23 +166,21 @@ function makeParticle(x, y, stroke, index) {
     homeY: y,
     vx: Math.cos(angle) * rand(.1, .7),
     vy: Math.sin(angle) * rand(.1, .7),
-    color: colorFor(stroke.role, Math.floor(rand(0, 4))),
+    color: stroke.color,
     index,
     phase: rand(0, TAU),
-    size: rand(.5, 1.8),
+    size: rand(8, 22),
     ink: rand(.45, 1),
     released: 0
   });
 }
 
 function beginStroke(x, y) {
-  currentStroke = { id: nextStrokeId++, role, points: [{ x, y }] };
+  currentStroke = { id: nextStrokeId++, role, color: colorFor(role, 0), mirrored, points: [{ x, y }] };
 
   const g = gesture.ctx;
-  g.fillStyle = rgba(colorFor(role, 0), pigment * .8);
-  g.beginPath();
-  g.arc(x, y, 2.2, 0, TAU);
-  g.fill();
+  dab(g, x, y, 24, currentStroke.color, pigment);
+  if (currentStroke.mirrored) dab(g, W - x, y, 24, currentStroke.color, pigment);
   if (!running) render();
 }
 
@@ -155,24 +199,8 @@ function addPoint(x, y) {
   for (let i = 1; i <= n; i++) {
     const t = i / n;
     const px = a.x + dx * t, py = a.y + dy * t;
-    const previous = i === 1 ? a : {
-      x: a.x + dx * (i - 1) / n,
-      y: a.y + dy * (i - 1) / n
-    };
-
-    const width = 1.5 + Math.min(2.5, dist * .035);
-    g.lineCap = "round";
-    g.lineJoin = "round";
-    g.strokeStyle = rgba(colorFor(currentStroke.role, 0), pigment * .7);
-    g.lineWidth = width;
-    g.beginPath();
-    g.moveTo(previous.x, previous.y);
-    g.lineTo(px, py);
-    g.stroke();
-
-    g.strokeStyle = rgba(colorFor(currentStroke.role, 1), pigment * .055);
-    g.lineWidth = width * 5;
-    g.stroke();
+    dab(g, px, py, 18 + Math.min(12, dist * .08), currentStroke.color, pigment * .38);
+    if (currentStroke.mirrored) dab(g, W - px, py, 24, currentStroke.color, pigment * .38);
 
     if (i % 2 === 0 || i === n) points.push({ x: px, y: py });
   }
@@ -185,7 +213,11 @@ function finishStroke() {
     const stride = Math.max(1, Math.ceil(points.length / 180));
 
     for (let i = 0; i < points.length; i += stride) {
-      makeParticle(points[i].x, points[i].y, currentStroke, i);
+      for (let grain = 0; grain < 3; grain++) {
+        const x = points[i].x + rand(-14, 14), y = points[i].y + rand(-14, 14);
+        makeParticle(x, y, currentStroke, i + grain);
+        if (currentStroke.mirrored) makeParticle(W - x, y, currentStroke, i + grain);
+      }
     }
     currentStroke = null;
   }
@@ -283,7 +315,7 @@ function updateParticles() {
     p.vx = (p.vx + fx) * .982;
     p.vy = (p.vy + fy) * .982;
 
-    const maxSpeed = 1.2 + wild * 2;
+    const maxSpeed = .45 + wild * 1.25;
     const v = Math.hypot(p.vx, p.vy) + .001;
     if (v > maxSpeed) {
       p.vx = p.vx / v * maxSpeed;
@@ -295,40 +327,31 @@ function updateParticles() {
 }
 
 function drawParticles() {
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
   for (const p of particles) {
-    const speed = Math.hypot(p.vx, p.vy);
-    const alpha = pigment * (.3 + p.ink * .5);
-    ctx.strokeStyle = rgba(p.color, alpha);
-    ctx.lineWidth = p.size;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(p.x - p.vx * (1.2 + p.released), p.y - p.vy * (1.2 + p.released));
-    ctx.lineTo(p.x + p.vx * .7, p.y + p.vy * .7);
-    ctx.stroke();
-
-    if (p.index % 11 === 0) {
-      ctx.fillStyle = rgba(p.color, alpha * .22);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * (1.5 + speed * .4), 0, TAU);
-      ctx.fill();
-    }
+    const breath = 1 + Math.sin(elapsed * .00045 + p.phase) * .14;
+    const radius = p.size * (1.2 + diffusion * 1.7) * breath;
+    dab(ctx, p.x, p.y, radius, p.color, pigment * (.3 + p.ink * .45));
   }
+  ctx.restore();
 }
 
 function updateTraces() {
   const g = traces.ctx;
   g.save();
   g.globalCompositeOperation = "destination-out";
-  g.fillStyle = "rgba(0,0,0,.014)";
+  g.fillStyle = `rgba(0,0,0,${.008 + (1 - memory) * .012})`;
   g.fillRect(0, 0, W, H);
   g.restore();
 
   for (let i = 0; i < particles.length; i += 2) {
     const p = particles[i];
-    g.fillStyle = rgba(p.color, pigment * .012);
-    g.beginPath();
-    g.arc(p.x, p.y, p.size * 1.5, 0, TAU);
-    g.fill();
+    dab(g, p.x, p.y, p.size * (1.4 + diffusion), p.color, pigment * .08);
+    if (p.index % 5 === 0) {
+      g.fillStyle = rgba(p.color, pigment * .1);
+      g.fillRect(p.x + Math.sin(p.phase) * p.size, p.y + Math.cos(p.phase) * p.size, 1, 1);
+    }
   }
 }
 
@@ -353,8 +376,7 @@ function update() {
 }
 
 function render() {
-  ctx.fillStyle = PAPER;
-  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(paper.canvas, 0, 0);
   ctx.drawImage(traces.canvas, 0, 0);
   ctx.drawImage(gesture.canvas, 0, 0);
   drawParticles();
@@ -409,6 +431,7 @@ function setPressed(id, pressed) {
 function setRole(r) {
   finishStroke();
   role = r;
+  renderPalette();
   observing = false;
   setPressed("patient", r === 0);
   setPressed("psy", r === 1);
@@ -428,6 +451,27 @@ $("observe").onclick = () => {
     ? "Observez ce qui apparaît, sans chercher à nommer."
     : "Vous pouvez reprendre le dialogue par le dessin.";
 };
+
+function renderPalette() {
+  $("swatches").replaceChildren();
+  PALETTES[paletteIndex].colors.forEach((color, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "swatch";
+    button.style.setProperty("--swatch", rgba(color, 1));
+    button.setAttribute("aria-label", PALETTES[paletteIndex].labels[index]);
+    button.title = PALETTES[paletteIndex].labels[index];
+    button.setAttribute("aria-pressed", String(selectedColors[role] === index));
+    button.onclick = () => { finishStroke(); selectedColors[role] = index; renderPalette(); };
+    $("swatches").append(button);
+  });
+}
+$("palette").onchange = e => { finishStroke(); paletteIndex = Number(e.target.value); renderPalette(); };
+$("mirror").onclick = () => {
+  finishStroke(); mirrored = !mirrored; setPressed("mirror", mirrored);
+};
+$("diffusion").oninput = e => { diffusion = +e.target.value / 100; render(); };
+renderPalette();
 
 $("memory").oninput = e => { memory = +e.target.value / 100; };
 $("wild").oninput = e => { wild = +e.target.value / 100; };
@@ -454,7 +498,7 @@ $("reset").onclick = () => {
   gesture.ctx.clearRect(0, 0, W, H);
   setPressed("observe", false);
   $("invitation").textContent = "Une nouvelle rencontre commence. Dessinez.";
-  $("status").textContent = "0 particules";
+  $("status").textContent = "0 pigments";
   render();
 };
 
@@ -504,7 +548,7 @@ function animate(now) {
 
   fpsTimer += dt;
   if (fpsTimer > 1000) {
-    $("status").textContent = particles.length + " particules";
+    $("status").textContent = particles.length + " pigments";
     fpsTimer = 0;
   }
 }
