@@ -1,4 +1,5 @@
 "use strict";
+import { createHabitat, seedHabitat, stepHabitat, advancePigments } from "./living.mjs";
 
 const $ = id => document.getElementById(id);
 const canvas = $("art");
@@ -19,7 +20,7 @@ let mirrored = false;
 let diffusion = .55;
 
 const MAX_PARTICLES = 950;
-const CELL = 38;
+let habitat;
 const STEP = 1000 / 30;
 
 let W = 0, H = 0, DPR = 1;
@@ -51,6 +52,8 @@ const stamps = new Map();
 
 // Reusable translucent pigment grains: soft wash, irregular edges, sediment.
 function pigmentStamp(color) {
+  // Quantize evolving colors and bound the cache, including long sessions.
+  color = color.map(c => Math.round(c / 12) * 12);
   const key = color.join(",");
   if (stamps.has(key)) return stamps.get(key);
   const stamp = document.createElement("canvas");
@@ -68,6 +71,7 @@ function pigmentStamp(color) {
     g.fillStyle = rgba(color, rand(.025, .13));
     g.fillRect(48 + Math.cos(angle) * radius, 48 + Math.sin(angle) * radius, rand(.4, 1.5), rand(.4, 1.5));
   }
+  if (stamps.size >= 192) stamps.delete(stamps.keys().next().value);
   stamps.set(key, stamp);
   return stamp;
 }
@@ -88,6 +92,7 @@ function resize() {
   const oldW = W, oldH = H;
   W = innerWidth;
   H = innerHeight;
+  habitat = createHabitat(W, H, habitat);
   DPR = Math.min(devicePixelRatio || 1, 1.5);
 
   canvas.width = Math.round(W * DPR);
@@ -140,16 +145,6 @@ function resize() {
   render();
 }
 
-function flow(x, y, t) {
-  const angle =
-    Math.sin(x * .008 + t * .29) * 1.7 +
-    Math.cos(y * .011 - t * .21) * 1.5 +
-    Math.sin((x + y) * .017 + t * .13) * .9 +
-    Math.cos((x - y) * .026 - t * .18) * .65;
-
-  return { x: Math.cos(angle), y: Math.sin(angle) };
-}
-
 function colorFor(r, index) {
   return PALETTES[paletteIndex].colors[(selectedColors[r] + index) % 6];
 }
@@ -159,6 +154,7 @@ function makeParticle(x, y, stroke, index) {
     particles.splice(0, Math.min(15, particles.length));
   }
 
+  seedHabitat(habitat, x, y);
   const angle = rand(0, TAU);
   particles.push({
     x, y,
@@ -166,7 +162,8 @@ function makeParticle(x, y, stroke, index) {
     homeY: y,
     vx: Math.cos(angle) * rand(.1, .7),
     vy: Math.sin(angle) * rand(.1, .7),
-    color: stroke.color,
+    color: [...stroke.color],
+    settled: 0, density: 0, activity: .5, signal: 0, heading: angle,
     index,
     phase: rand(0, TAU),
     size: rand(8, 22),
@@ -230,109 +227,32 @@ function finishStroke() {
   render();
 }
 
-function buildGrid() {
-  const grid = new Map();
-  for (let i = 0; i < particles.length; i++) {
-    const p = particles[i];
-    const key = Math.floor(p.x / CELL) + "," + Math.floor(p.y / CELL);
-    let bucket = grid.get(key);
-    if (!bucket) {
-      bucket = [];
-      grid.set(key, bucket);
-    }
-    bucket.push(i);
-  }
-  return grid;
-}
-
 function updateParticles() {
-  const grid = buildGrid();
-  const t = elapsed * .001;
-
-  for (let i = 0; i < particles.length; i++) {
-    const p = particles[i];
-    p.released = Math.min(1, p.released + .006 + wild * .012);
-
-    const gx = Math.floor(p.x / CELL), gy = Math.floor(p.y / CELL);
-    let separationX = 0, separationY = 0;
-    let alignmentX = 0, alignmentY = 0;
-    let cohesionX = 0, cohesionY = 0;
-    let neighbors = 0;
-
-    for (let oy = -1; oy <= 1; oy++) {
-      for (let ox = -1; ox <= 1; ox++) {
-        const bucket = grid.get((gx + ox) + "," + (gy + oy));
-        if (!bucket) continue;
-
-        for (const j of bucket) {
-          if (i === j) continue;
-          const q = particles[j];
-          const dx = q.x - p.x, dy = q.y - p.y;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < 1 || d2 > 1450) continue;
-
-          neighbors++;
-          alignmentX += q.vx;
-          alignmentY += q.vy;
-          cohesionX += dx;
-          cohesionY += dy;
-
-          if (d2 < 140) {
-            separationX -= dx / (d2 + 4);
-            separationY -= dy / (d2 + 4);
-          }
-          if (neighbors >= 16) break;
-        }
-      }
-    }
-
-    let fx = 0, fy = 0;
-    if (neighbors) {
-      fx += cohesionX / neighbors * .002;
-      fy += cohesionY / neighbors * .002;
-      fx += (alignmentX / neighbors - p.vx) * .035;
-      fy += (alignmentY / neighbors - p.vy) * .035;
-      fx += separationX * .55;
-      fy += separationY * .55;
-    }
-
-    const wind = flow(p.x, p.y, t);
-    fx += wind.x * (.025 + wild * .09);
-    fy += wind.y * (.025 + wild * .09);
-    fx += Math.sin(t * 1.4 + p.phase) * wild * .025;
-    fy += Math.cos(t * 1.1 + p.phase) * wild * .025;
-
-    const homeForce = memory * .0045 * (1 - p.released * .88);
-    fx += (p.homeX - p.x) * homeForce;
-    fy += (p.homeY - p.y) * homeForce;
-
-    const margin = 55;
-    if (p.x < margin) fx += .09;
-    if (p.x > W - margin) fx -= .09;
-    if (p.y < margin) fy += .09;
-    if (p.y > H - margin) fy -= .09;
-
-    p.vx = (p.vx + fx) * .982;
-    p.vy = (p.vy + fy) * .982;
-
-    const maxSpeed = .45 + wild * 1.25;
-    const v = Math.hypot(p.vx, p.vy) + .001;
-    if (v > maxSpeed) {
-      p.vx = p.vx / v * maxSpeed;
-      p.vy = p.vy / v * maxSpeed;
-    }
-    p.x += p.vx * p.released;
-    p.y += p.vy * p.released;
-  }
+  stepHabitat(habitat, diffusion);
+  stepHabitat(habitat, diffusion);
+  advancePigments(particles, habitat, { memory, wild, diffusion });
 }
 
 function drawParticles() {
   ctx.save();
   ctx.globalCompositeOperation = "multiply";
   for (const p of particles) {
-    const breath = 1 + Math.sin(elapsed * .00045 + p.phase) * .14;
-    const radius = p.size * (1.2 + diffusion * 1.7) * breath;
-    dab(ctx, p.x, p.y, radius, p.color, pigment * (.3 + p.ink * .45));
+    const radius = p.size * (.85 + diffusion * 1.5) * (.8 + p.activity * .45);
+    const stretch = 1 + Math.min(.75, Math.hypot(p.vx, p.vy) * .6);
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.heading);
+    ctx.scale(stretch, 1 / stretch);
+    dab(ctx, 0, 0, radius, p.color, pigment * (.18 + p.ink * .28) * (1 - p.settled * .35));
+    ctx.restore();
+    // Condensation and pores follow local activation and crowding.
+    if (p.signal > .12) {
+      ctx.strokeStyle = rgba(p.color, pigment * p.signal * .24);
+      ctx.lineWidth = .5 + p.settled;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, radius * .55, radius * .28, p.heading, 0, TAU);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -347,10 +267,15 @@ function updateTraces() {
 
   for (let i = 0; i < particles.length; i += 2) {
     const p = particles[i];
-    dab(g, p.x, p.y, p.size * (1.4 + diffusion), p.color, pigment * .08);
-    if (p.index % 5 === 0) {
+    dab(g, p.x, p.y, p.size * (1.4 + diffusion), p.color, pigment * (.025 + p.settled * .1));
+    if (p.settled > .12 || p.signal > .2) {
       g.fillStyle = rgba(p.color, pigment * .1);
-      g.fillRect(p.x + Math.sin(p.phase) * p.size, p.y + Math.cos(p.phase) * p.size, 1, 1);
+      g.beginPath();
+      g.moveTo(p.x, p.y);
+      g.lineTo(p.x - Math.cos(p.heading) * (2 + p.settled * 8), p.y - Math.sin(p.heading) * (2 + p.settled * 8));
+      g.strokeStyle = rgba(p.color, pigment * (.05 + p.settled * .18));
+      g.lineWidth = .7;
+      g.stroke();
     }
   }
 }
@@ -490,6 +415,7 @@ $("pause").onclick = () => {
 $("reset").onclick = () => {
   finishStroke();
   particles = [];
+  habitat = createHabitat(W, H);
   observing = false;
   elapsed = 0;
   accumulator = 0;

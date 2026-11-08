@@ -30,6 +30,7 @@ Ouvrir <http://localhost:5173>. Le serveur utilise `PORT` si cette variable est 
 
 ```sh
 npm run check
+npm test
 npm run build
 npm run preview
 ```
@@ -46,7 +47,20 @@ Tout hébergeur de fichiers statiques peut également servir le contenu de `dist
 
 - `index.html` : interface en français.
 - `src/style.css` : présentation et adaptation aux petits écrans.
-- `src/main.js` : dessin, simulation 2D, modes et export PNG.
+- `src/main.js` : dessin, rendu des pigments, modes et export PNG.
+- `src/living.mjs` : milieu de réaction-diffusion et interactions locales des pigments.
+- `tests/living.test.mjs` : propagation, affinités, échange de couleur, dépôts et redimensionnement.
 - `scripts/` : serveur local et construction, avec les modules natifs de Node.js.
 
 Le rendu utilise Canvas 2D, avec un plafond de 950 grains de pigment et une simulation à 30 pas par seconde. Des empreintes de pigment précalculées permettent de composer les lavis et leur granulation sans dépendance externe. Les couches colorées se superposent en mode multiplication ; les anciennes empreintes s’estompent selon le réglage Mémoire pour limiter la saturation de l’image.
+
+## Organisation de la matière
+
+Les formes s’inspirent de mécanismes d’organisation du vivant. Il s’agit d’une analogie artistique, pas d’une simulation biologique validée.
+
+- **Activation et ressources** : le geste ensemence un milieu de réaction-diffusion de type Gray–Scott. Une activation locale consomme une ressource qui se renouvelle et diffuse plus vite ; les concentrations créent des fronts et des motifs.
+- **Migration collective** : les pigments suivent les gradients du milieu, s’alignent avec leurs voisins et s’attirent selon leur affinité chromatique. Une répulsion à courte distance ménage des espaces dans les amas. Aucun vent global ne dicte leur trajectoire.
+- **Couleurs en contact** : les voisins échangent progressivement leur couleur. Les pigments éloignés conservent leur teinte ; les couleurs de la palette restent intactes.
+- **Condensation et dépôt** : les amas denses et les zones pauvres en ressources ralentissent la matière. Les concentrations d’activation dessinent des contours ; les dépôts laissent des filaments orientés par le déplacement. La largeur des lavis dépend de l’activité locale et de la diffusion, plutôt que d’une pulsation décorative.
+
+La simulation est plafonnée à 950 pigments. Le milieu est calculé sur une grille adaptative plafonnée à 160 × 120 cellules ; le cache des empreintes de couleur est borné. La pause suspend le milieu et les pigments, le redimensionnement conserve leurs états, et « Nouvelle œuvre » réinitialise aussi le milieu.
