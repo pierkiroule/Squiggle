@@ -1,24 +1,24 @@
 # Le Squiggle du Vivant •°
 
-**Effleurer le vivant. Laisser une forme émerger.**
+Un cadavre exquis dessiné à plusieurs, avec un invité inattendu.
 
-Un espace partagé entre patient et psychologue : une surface déjà habitée par des milliers de micrograins, comme une nuée d’étourneaux. Chaque grain reste un point distinct. Les formes projectives apparaissent dans les courants, les densités et les vides créés par la rencontre avec le geste.
+Les joueurs partagent une feuille sur le même appareil. L’application distribue les tours ; chacun dessine librement, puis passe la main. Entre certains tours, **le vivant** s’invite pendant quatre secondes : les traits se déforment, s’accordent et font pousser quelques ramifications. Le dessin se fige ensuite dans ce nouvel état et le joueur suivant poursuit la rencontre.
 
-L’inspiration est celle d’un dialogue avec une matière vivante, comme les signes mouvants de *Premier Contact*. L’application ne reconnaît pas de langage et ne produit pas de réponse sémantique : sa réponse est le mouvement collectif de la matière.
+À la fin, la partie devient un petit film en **stop motion** : les gestes, les annulations et les métamorphoses peuvent être revus dans l’ordre.
 
-## Toucher la surface
+## Jouer
 
-- **Glisser** au doigt, au stylet ou à la souris : écarter les grains et les entraîner dans un sillage.
-- **Tapoter** : transmettre une couleur aux grains au contact et déclencher une onde de dispersion qui se propage puis s’atténue.
-- **Rester au même endroit** : après un court maintien, attirer les grains et condenser la couleur. La pression du stylet module la portée et la transmission du pigment.
-- **Retirer le doigt** : laisser la nuée poursuivre son organisation. Le geste ne crée pas de grains supplémentaires.
-- Passer de **Patient** à **Psychologue** pour répondre avec sa propre couleur ; choisir **Observer** pour suspendre les contacts et regarder la matière évoluer.
-- Choisir une harmonie — **Nébuleuse**, **Terres vivantes**, **Marées** — puis l’un de ses six pigments. Chaque rôle garde sa sélection.
-- Activer **Miroir** pour toucher la surface des deux côtés. Les grains évoluent ensuite librement.
-- Ajuster **Mémoire** (attachement aux empreintes du geste), **Sauvagerie** (mobilité), **Pigment** (présence visuelle des points) et **Échanges** (transmission locale des couleurs et diffusion du milieu).
-- Mettre en **Pause**, **Enregistrer** une image PNG ou commencer une **Nouvelle œuvre**, qui renouvelle la population de la surface.
+1. Indiquer le nombre de joueurs (1 à 8) et les passages par joueur (2, 3 ou 5).
+2. Dessiner au doigt, au stylet ou à la souris. Choisir une couleur, une épaisseur, le crayon ou la gomme. La pression du stylet module le trait.
+3. **Annuler** retire le dernier trait du tour en cours. Les marques des tours précédents restent communes.
+4. **Passer la main** laisse l’application choisir le prochain joueur. Chaque joueur passe une fois par ronde, dans un ordre mélangé, sans répétition immédiate entre deux rondes si vous êtes plusieurs.
+5. Quand le vivant intervient, les outils sont temporairement verrouillés. L’intervention transforme les véritables points des traits : son résultat reste sur la feuille.
+6. La partie se termine après le nombre de passages choisi, ou avec **Terminer**.
+7. **Rejouer le rêve** lance le film. La pause, la barre de lecture et trois rythmes permettent de le parcourir. **Image PNG** conserve l’instant affiché.
 
-Aucun dessin n’est interprété automatiquement. Aucune IA, aucun suivi d’audience, aucun service externe. L’œuvre reste en mémoire dans le navigateur ; recharger ou fermer la page l’efface. **Enregistrer** conserve une image sur l’appareil.
+Les premières interventions arrivent après deux ou trois tours, puis après deux à quatre tours. Une partie courte avec au moins deux tours et un dessin reçoit une visite avant le dernier tour. Une feuille vide ne provoque pas d’intervention.
+
+**Nouvelle partie** demande confirmation avant d’effacer le dessin et son film. Aucun enregistrement durable ni envoi vers un service externe : fermer ou recharger la page efface la partie. Le replay est disponible dans l’application ; l’export proposé est une image PNG, pas un fichier vidéo.
 
 ## Développer
 
@@ -26,35 +26,20 @@ Node.js 20 ou plus récent. Aucune dépendance à installer.
 
 ```sh
 npm run dev
-```
-
-Le serveur écoute sur le port 5173. La variable `PORT` ou l’argument `--port` permettent d’en choisir un autre.
-
-```sh
 npm run check
 npm test
 npm run build
 npm run preview
 ```
 
-`dist/` contient l’application statique complète. `vercel.json` configure la construction et ce dossier de sortie ; aucun secret requis. Tout hébergeur statique peut aussi servir `dist/`.
+Le serveur utilise le port 5173, surchargeable avec `PORT` ou `--port`. `dist/` contient l’application statique complète. `vercel.json` configure la construction et le dossier de sortie. Aucun secret ni service requis.
 
-## Organisation de la nuée
+## Fonctionnement
 
-Il s’agit d’une analogie artistique inspirée de l’organisation du vivant, pas d’une simulation biologique validée.
+- `src/game.mjs` : distribution des tours, interventions, historique et transformation des tracés.
+- `src/main.js` : outil de dessin, captures de gestes, animation de quatre secondes, replay et export.
+- `tests/game.test.mjs` : règles des tours, visites, transformations, intégrité des captures et conservation de l’historique.
 
-- **Une population préexistante** : de 2 200 à 6 500 micrograins selon la surface à l’ouverture. Une propulsion individuelle entretient le mouvement, même sans geste.
-- **Interactions locales** : alignement des vitesses, adhésion selon l’affinité chromatique et répulsion à courte distance. Aucun vent global ne dicte les trajectoires.
-- **Milieu actif** : les contacts ensemencent un milieu de réaction-diffusion Gray–Scott. L’activation consomme une ressource qui se renouvelle et diffuse ; les gradients orientent les grains.
-- **Empreinte du contact** : les mouvements, les ondes et l’attraction d’un contact maintenu déplacent les grains existants. Leur couleur se transmet au contact, puis lentement entre voisins. Les points éloignés gardent leur couleur.
-- **Mémoire et condensation** : les zones denses ralentissent, les positions de référence se déplacent au contact et les nuées gardent temporairement l’empreinte du geste. Les formes restent composées de points, sans lavis, flou ni contours dessinés par-dessus.
+La feuille conserve des coordonnées fixes pour préserver le dessin et le replay lors d’un redimensionnement ; elle est ajustée avec des marges si nécessaire. Le vivant combine élasticité locale, alignement des vitesses, exclusion à courte distance et croissance de ramifications depuis des marques existantes. C’est une analogie artistique, pas un modèle biologique ni une interprétation automatique.
 
-La simulation fonctionne à pas fixes de 30 Hz avec voisinage spatial et grille plafonnée à 160 × 120 cellules. Les positions et le milieu sont conservés au redimensionnement. La pause suspend le mouvement, les échanges et les ondes ; « Nouvelle œuvre » renouvelle les grains et réinitialise le milieu.
-
-## Sources
-
-- `index.html`, `src/style.css` : interface française adaptée aux petits écrans.
-- `src/main.js` : contacts, rendu des points, palettes et export PNG.
-- `src/living.mjs` : milieu, nuée, interactions locales et forces de contact.
-- `tests/living.test.mjs` : propagation, ressources, affinités, couleurs, stabilité, population initiale, gestes et ondes.
-- `scripts/` : serveur et construction avec les modules natifs de Node.js.
+Le film conserve des instantanés vectoriels : pendant les gestes, à la fin des traits et pendant les métamorphoses. Les traits inchangés sont partagés entre les images ; au-delà de 600 instants, les anciennes captures sont espacées pour conserver le début, la fin et la continuité de la partie. Les gestes longs sont échantillonnés. Les onglets masqués suspendent l’animation et la lecture.
