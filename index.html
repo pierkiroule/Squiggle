@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f1eee6">
+  <meta name="description" content="Un espace de dessin partagé : les tracés deviennent des particules et prennent vie. Le Squiggle du Vivant •°.">
+  <title>Le Squiggle du Vivant •°</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <link rel="stylesheet" href="./src/style.css">
+  <script type="module" src="./src/main.js"></script>
+</head>
+<body>
+  <canvas id="art" aria-label="Espace de dessin du Squiggle du Vivant. Dessinez au doigt, au stylet ou à la souris."></canvas>
+
+  <header>
+    <h1>Le Squiggle du Vivant •°</h1>
+    <p>Ce que nous traçons prend vie.</p>
+  </header>
+
+  <div id="status" aria-hidden="true"></div>
+
+  <footer>
+    <div id="invitation" aria-live="polite">
+      Dessinez librement. Puis laissez la forme vous surprendre.
+    </div>
+
+    <div class="controls" role="group" aria-label="Participation">
+      <button id="patient" class="active" type="button" aria-pressed="true">Patient</button>
+      <button id="psy" type="button" aria-pressed="false">Psychologue</button>
+      <button id="observe" type="button" aria-pressed="false">Observer</button>
+    </div>
+
+    <div class="settings">
+      <label for="memory">
+        Mémoire
+        <input id="memory" type="range" min="0" max="100" value="38">
+      </label>
+      <label for="wild">
+        Sauvagerie
+        <input id="wild" type="range" min="0" max="100" value="62">
+      </label>
+      <label for="pigment">
+        Encre
+        <input id="pigment" type="range" min="10" max="100" value="70">
+      </label>
+    </div>
+
+    <div class="controls" role="group" aria-label="Œuvre">
+      <button id="pause" type="button" aria-pressed="false">Pause</button>
+      <button id="save" type="button">Enregistrer</button>
+      <button id="reset" type="button">Nouvelle œuvre</button>
+    </div>
+
+    <div id="help">Aucun dessin n'est interprété automatiquement.</div>
+  </footer>
+
+  <noscript>Activez JavaScript pour dessiner et laisser les formes prendre vie.</noscript>
+</body>
+</html>
